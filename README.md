@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project is in **Stage 5A: BigQuery Data Architecture & IaC Definition**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, and Stage 4 established the OpenTofu foundation.
+The project has completed **Stage 5: BigQuery Data Architecture**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, and Stage 4 established the OpenTofu foundation.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, and BigQuery RAW/CORE/MART dataset definitions. Stage 5B is still required before any BigQuery resources are provisioned.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, and provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Stage 6 will define canonical event contracts before physical table schemas.
 
 ## Project Goals
 

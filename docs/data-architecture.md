@@ -1,6 +1,6 @@
 # Data Architecture
 
-SupplyChain Sentinel uses a layered BigQuery analytical model. Stage 5A defines the target dataset boundaries and OpenTofu resource definitions only. It does not provision datasets, create tables, define schemas, load data, or implement transformations.
+SupplyChain Sentinel uses a layered BigQuery analytical model. Stage 5 has provisioned the RAW, CORE, and MART dataset boundaries in BigQuery Sandbox through OpenTofu. It does not create tables, define schemas, load data, or implement transformations.
 
 ## Analytical Layers
 
@@ -114,10 +114,12 @@ The current development phase runs without a Cloud Billing Account. BigQuery San
 Current billing-free development must account for:
 
 - Limited free storage and query usage.
-- Automatic sandbox expiration behavior.
+- Automatic sandbox expiration behavior: development datasets explicitly represent the Sandbox 60-day default expiration for tables and partitions.
 - No streaming support.
 - No BigQuery DML support.
 - No BigQuery Data Transfer Service support.
+
+The 60-day Sandbox expiration is an environment constraint, not an enterprise production retention policy. Future production deployment must redesign retention separately for RAW, CORE, and MART based on business, compliance, cost, and replay requirements.
 
 Billing-free development should not claim to validate production streaming behavior. Future full-cloud integration in an explicitly approved Free Trial or other billing-enabled environment must validate capabilities unavailable in Sandbox.
 

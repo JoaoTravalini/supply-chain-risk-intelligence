@@ -2,7 +2,7 @@
 
 This directory contains the OpenTofu root module for SupplyChain Sentinel.
 
-Stage 5A defines the BigQuery analytical dataset architecture in OpenTofu. It does not provision resources; Stage 5B will authenticate OpenTofu, review a real plan, and decide whether to apply the dataset definitions into BigQuery Sandbox.
+Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. It does not define tables, schemas, views, data loads, or transformations.
 
 ## Requirements
 
@@ -38,7 +38,9 @@ The root module declares exactly three BigQuery datasets:
 
 These datasets represent analytical boundaries only. No table resources, schemas, views, routines, dataset access blocks, IAM bindings, external connections, reservations, or encryption resources are defined in Stage 5A.
 
-The datasets are intended for BigQuery Sandbox during billing-free development. Sandbox validation does not cover production streaming behavior, because streaming is unavailable without billing.
+The datasets are managed by OpenTofu in BigQuery Sandbox during billing-free development. Sandbox validation does not cover production streaming behavior, because streaming is unavailable without billing.
+
+BigQuery Sandbox enforces 60-day expiration for tables and partitions. The root module represents this development behavior explicitly with `bigquery_sandbox_default_expiration_ms`; this is not a production retention policy. Future production deployment must redesign retention separately for RAW, CORE, and MART based on business, compliance, cost, and replay requirements.
 
 Datasets are persistent analytical boundaries. The module deliberately does not set `delete_contents_on_destroy = true`; accidental infrastructure destroy operations must not silently delete future dataset contents.
 
@@ -53,6 +55,8 @@ cp terraform.tfvars.example terraform.tfvars
 Use a real project ID only in local, ignored files. Do not commit developer-specific project IDs, credentials, billing identifiers, or secrets.
 
 `bigquery_location` defaults to `US` for synthetic, non-sensitive portfolio development data. Future production deployment must review residency, service co-location, latency, and organizational requirements.
+
+`bigquery_sandbox_default_expiration_ms` defaults to `5184000000`, representing BigQuery Sandbox's 60-day table and partition expiration in the billing-free development project. Production retention requirements are intentionally deferred.
 
 ## State Strategy
 
@@ -85,4 +89,4 @@ tofu providers
 
 These commands are non-mutating with respect to cloud resources. `tofu init` may create local `.terraform/` files and `.terraform.lock.hcl`; `.terraform/` is ignored and `.terraform.lock.hcl` is versioned.
 
-Do not run `tofu apply` in Stage 5A. A real plan and any apply are deferred to Stage 5B.
+Do not run `tofu apply` as a validation command. Future applies require explicit human review of the exact saved plan to be applied.

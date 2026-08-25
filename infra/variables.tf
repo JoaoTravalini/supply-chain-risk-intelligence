@@ -18,3 +18,14 @@ variable "bigquery_location" {
     error_message = "bigquery_location must be a valid BigQuery location identifier such as US, EU, or a supported regional location."
   }
 }
+
+variable "bigquery_sandbox_default_expiration_ms" {
+  description = "Default table and partition expiration, in milliseconds, used to represent BigQuery Sandbox's 60-day billing-free development behavior. This is not a production retention policy."
+  type        = number
+  default     = 5184000000
+
+  validation {
+    condition     = var.bigquery_sandbox_default_expiration_ms > 0
+    error_message = "bigquery_sandbox_default_expiration_ms must be a positive expiration duration in milliseconds."
+  }
+}

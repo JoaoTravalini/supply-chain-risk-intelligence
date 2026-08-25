@@ -55,6 +55,7 @@ These standards define future project conventions. They are part of the Stage 0 
 - Prefer separate workload identities for separate workloads.
 - Keep agent access to analytical datasets read-only unless an explicit design decision grants write access.
 - During the billing-free development phase, do not link a Cloud Billing Account to the project.
+- BigQuery Sandbox retention behavior must be represented explicitly in development infrastructure when it affects drift detection, but it must not be treated as a production retention policy.
 - A future decision to enable billing requires explicit developer approval, service pricing review, security controls review, quota and limit review, and review of exposure to unintended charges.
 - Cloud Billing budgets may support monitoring and alerts, but they must not be treated as hard spending caps.
 

@@ -1,2 +1,6 @@
 project_id = "supplychain-sentinel-XXXXXX"
 bigquery_location = "US"
+
+# BigQuery Sandbox enforces 60-day expiration for tables and partitions in
+# billing-free development projects. Keep production retention separate.
+bigquery_sandbox_default_expiration_ms = 5184000000

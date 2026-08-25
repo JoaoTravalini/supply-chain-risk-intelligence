@@ -38,4 +38,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-The project is currently in Stage 5A: BigQuery Data Architecture & IaC Definition. This stage defines the RAW, CORE, and MART BigQuery datasets and documentation only; Stage 5B is still required for plan review, Sandbox provisioning, and cloud-state validation.
+Stage 5: BigQuery Data Architecture is complete. The RAW, CORE, and MART BigQuery Sandbox datasets are provisioned and managed by OpenTofu with billing disabled. Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and no physical BigQuery tables exist yet.
+
+The next stage is Stage 6: Canonical Event Contract. Stage 6 will define canonical event contracts before physical table schemas.

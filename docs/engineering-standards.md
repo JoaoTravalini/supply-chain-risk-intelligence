@@ -62,6 +62,17 @@ These standards define future project conventions. They are part of the Stage 0 
 - Cloud Run and other managed deployment infrastructure are deferred until a later deployment decision.
 - Local emulator and cloud adapters should remain behind explicit system boundaries so domain logic does not need to be rewritten for deployment.
 
+## Infrastructure as Code
+
+- Infrastructure changes must be declarative when an IaC definition is appropriate.
+- Do not hand-create application infrastructure that should be managed through OpenTofu.
+- Provider versions must be constrained in configuration and locked in `.terraform.lock.hcl`.
+- OpenTofu state, plan files, credentials, and real tfvars files must never be committed.
+- Secrets must not be intentionally placed in tfvars or state.
+- `tofu fmt` and `tofu validate` are mandatory for infrastructure changes.
+- `tofu apply` must never be treated as an automatic local validation step.
+- Future plans must be reviewed before applies.
+
 ## Observability
 
 - Use structured logging for production code.

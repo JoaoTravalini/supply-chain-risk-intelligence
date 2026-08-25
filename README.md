@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project is in **Stage 3: Billing-Free GCP Project Bootstrap**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, and Stage 2 established local quality tooling.
+The project is in **Stage 4: Infrastructure as Code Foundation**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, and Stage 3 documented the billing-free Google Cloud bootstrap.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, and documentation for a billing-free Google Cloud project bootstrap. Application cloud resources, infrastructure code, application features, and CI/CD workflows have not been created yet.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, and an OpenTofu root module foundation. Application cloud resources, application features, and CI/CD workflows have not been created yet.
 
 ## Project Goals
 
@@ -44,3 +44,4 @@ Canonical local quality checks are:
 - [Roadmap](docs/roadmap.md)
 - [Architectural Decisions](docs/decisions)
 - [GCP Project Bootstrap Runbook](docs/runbooks/gcp-project-bootstrap.md)
+- [Infrastructure](infra/README.md)

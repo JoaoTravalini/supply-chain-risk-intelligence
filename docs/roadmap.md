@@ -38,4 +38,4 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-The project is currently in Stage 3: Billing-Free GCP Project Bootstrap. This stage documents and validates the manually created billing-free Google Cloud project only; BigQuery Sandbox, Pub/Sub emulator setup, managed cloud infrastructure, and application implementation remain deferred.
+The project is currently in Stage 4: Infrastructure as Code Foundation. This stage establishes only the OpenTofu root module, provider lock, and IaC standards; resource definitions for BigQuery, Pub/Sub, Cloud Run, IAM, service accounts, Secret Manager, and application infrastructure remain deferred.

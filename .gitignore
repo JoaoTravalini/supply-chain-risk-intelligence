@@ -20,6 +20,23 @@ dist/
 coverage.xml
 htmlcov/
 
+# OpenTofu local artifacts
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.auto.tfvars
+*.auto.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+
 # Local environment and secret files
 .env
 .env.*

@@ -31,4 +31,3 @@ START
 - PostgreSQL becomes the transactional persistence target for LangGraph execution state.
 - BigQuery remains the analytical system of record, not agent checkpoint storage.
 - Human review and resume behavior must be treated as first-class workflow concerns.
-

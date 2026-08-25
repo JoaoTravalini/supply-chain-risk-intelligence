@@ -38,4 +38,4 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-The project is currently in Stage 1: Python Project Bootstrap. This stage establishes only the minimal Python packaging, runtime baseline, lockfile, and bootstrap import test.
+The project is currently in Stage 2: Quality Toolchain & Local Configuration. This stage establishes local Ruff, MyPy, Pytest, coverage, and pre-commit checks only.

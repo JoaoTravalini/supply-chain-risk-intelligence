@@ -14,3 +14,50 @@ build-backend = "uv_build"
 module-name = "supplychain"
 module-root = "src"
 
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.format]
+indent-style = "space"
+line-ending = "lf"
+quote-style = "double"
+
+[tool.mypy]
+files = ["src", "tests"]
+mypy_path = "src"
+python_version = "3.13"
+strict = true
+
+[tool.pytest.ini_options]
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+    "--cov=supplychain",
+    "--cov-report=term-missing",
+]
+python_classes = ["Test*"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["supplychain"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.4",
+]

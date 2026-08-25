@@ -20,4 +20,3 @@ Future deployable workloads may have separate entrypoints, but shared domain log
 - Boundaries between domain, adapters, services, data access, and UI code must remain explicit.
 - Tooling and CI can be centralized when implementation begins.
 - Application directories should be created only when their implementation stage requires them.
-

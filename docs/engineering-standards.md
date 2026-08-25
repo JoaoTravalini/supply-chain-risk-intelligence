@@ -65,6 +65,15 @@ These standards define future project conventions. They are part of the Stage 0 
 - Use end-to-end tests for critical user workflows once the product surface exists.
 - Use agent evaluations for LangGraph behavior once the investigation workflow exists.
 
+## Local Quality Gate
+
+- Ruff is the project formatter and linter.
+- MyPy runs in strict mode against `src/` and `tests/`.
+- Pytest is the canonical test runner.
+- Pytest coverage measures the `supplychain` package and reports missing lines.
+- Future Python stages are expected to pass `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy src tests`, and `uv run pytest`.
+- Pre-commit runs repository hygiene checks plus Ruff lint and format checks before commits.
+
 ## Documentation and Change Control
 
 - Update documentation when architecture changes.

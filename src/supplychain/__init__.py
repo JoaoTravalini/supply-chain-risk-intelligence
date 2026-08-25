@@ -1,2 +1,1 @@
 """SupplyChain Sentinel package."""
-

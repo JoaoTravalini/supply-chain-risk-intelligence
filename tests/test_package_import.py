@@ -1,13 +1,9 @@
-import unittest
+from importlib import import_module
+from types import ModuleType
 
 
-class PackageImportTest(unittest.TestCase):
-    def test_package_imports(self) -> None:
-        import supplychain
+def test_package_imports() -> None:
+    module = import_module("supplychain")
 
-        self.assertIsNotNone(supplychain)
-
-
-if __name__ == "__main__":
-    unittest.main()
-
+    assert isinstance(module, ModuleType)
+    assert module.__name__ == "supplychain"

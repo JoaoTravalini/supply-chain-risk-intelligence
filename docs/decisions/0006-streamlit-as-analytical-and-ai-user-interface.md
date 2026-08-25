@@ -20,4 +20,3 @@ The intended application areas are Overview, Suppliers, Events, and AI Investiga
 - UI implementation is deferred until the planned product stage.
 - Application code should still respect system boundaries and avoid embedding domain logic directly in UI components.
 - The UI should present deterministic risk outputs separately from LLM-generated explanations.
-

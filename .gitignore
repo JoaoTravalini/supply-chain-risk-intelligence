@@ -6,11 +6,19 @@ __pycache__/
 # Virtual environments and local caches
 .venv/
 .uv-cache/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
 
 # Build and packaging artifacts
 build/
 dist/
 *.egg-info/
+
+# Coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
 
 # Local environment and secret files
 .env

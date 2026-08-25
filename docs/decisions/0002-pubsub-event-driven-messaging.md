@@ -20,4 +20,3 @@ External information will be validated and normalized into canonical versioned e
 - Consumers cannot rely on exactly-once delivery semantics.
 - Processing workloads must track stable event identifiers where appropriate.
 - Failed or invalid messages must be observable and recoverable.
-

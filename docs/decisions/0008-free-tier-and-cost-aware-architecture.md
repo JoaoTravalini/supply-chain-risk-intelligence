@@ -20,4 +20,3 @@ Future implementation must consider BigQuery bytes processed, partition pruning,
 - Workloads should avoid unnecessary scheduling, scaling, and background execution.
 - External API and LLM usage should be limited, observable, and intentional.
 - Cost controls are architectural requirements, not late-stage optimizations.
-

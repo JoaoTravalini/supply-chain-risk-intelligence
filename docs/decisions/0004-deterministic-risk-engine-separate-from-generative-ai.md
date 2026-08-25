@@ -20,4 +20,3 @@ The LLM may retrieve data, investigate, correlate evidence, explain findings, su
 - Risk outputs must include enough metadata to support reproduction, such as calculation timestamp, model or rule version, component scores, and input references where appropriate.
 - Agent responses must distinguish evidence-backed explanation from authoritative calculated metrics.
 - Future prompt and tool design must prevent unrestricted metric generation.
-

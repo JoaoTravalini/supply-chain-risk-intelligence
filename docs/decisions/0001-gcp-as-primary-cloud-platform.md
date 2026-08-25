@@ -20,4 +20,3 @@ Target GCP services include Cloud Run, Pub/Sub, BigQuery, Cloud Scheduler, Googl
 - Cloud-specific code must remain behind adapters or infrastructure boundaries so domain logic is not coupled to provider SDKs.
 - GCP usage must be designed with least privilege and cost controls from the beginning.
 - Changing the primary cloud platform requires a new ADR.
-

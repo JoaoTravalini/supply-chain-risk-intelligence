@@ -277,4 +277,3 @@ The following ADRs are accepted for Stage 0:
 - [ADR 0006: Streamlit as Analytical and AI User Interface](decisions/0006-streamlit-as-analytical-and-ai-user-interface.md)
 - [ADR 0007: Monorepo with Shared Domain Modules](decisions/0007-monorepo-with-shared-domain-modules.md)
 - [ADR 0008: Free-Tier and Cost-Aware Architecture](decisions/0008-free-tier-and-cost-aware-architecture.md)
-

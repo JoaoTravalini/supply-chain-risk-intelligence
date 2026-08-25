@@ -26,4 +26,3 @@ BigQuery will not be used as transactional persistence for LangGraph execution s
 - RAW data should support replay, debugging, and audit scenarios.
 - Agent access to BigQuery should be read-only unless a later decision explicitly grants write access.
 - Transactional state must use a separate persistence mechanism.
-

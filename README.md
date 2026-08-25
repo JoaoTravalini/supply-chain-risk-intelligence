@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project is in **Stage 1: Python Project Bootstrap**. Stage 0 established the target architecture, engineering standards, roadmap, and major architectural decisions.
+The project is in **Stage 2: Quality Toolchain & Local Configuration**. Stage 0 established the target architecture, and Stage 1 established the minimal Python package bootstrap.
 
-The repository now contains the minimal Python package scaffold, project metadata, lockfile support, and a bootstrap import test. Cloud resources, infrastructure code, application features, and CI/CD workflows have not been created yet.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, and a bootstrap import test. Cloud resources, infrastructure code, application features, and CI/CD workflows have not been created yet.
 
 ## Project Goals
 
@@ -27,6 +27,13 @@ The LLM explains evidence and supports investigation. It does not define authori
 ## Engineering Philosophy
 
 The project favors deterministic business logic, explicit system boundaries, cloud-native deployment practices, least-privilege security, structured observability, cost-aware operation, and tests that keep business logic independent from infrastructure.
+
+Canonical local quality checks are:
+
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run mypy src tests`
+- `uv run pytest`
 
 ## Documentation
 

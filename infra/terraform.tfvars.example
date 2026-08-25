@@ -1,1 +1,2 @@
 project_id = "supplychain-sentinel-XXXXXX"
+bigquery_location = "US"

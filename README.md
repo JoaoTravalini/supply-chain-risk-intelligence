@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project is in **Stage 4: Infrastructure as Code Foundation**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, and Stage 3 documented the billing-free Google Cloud bootstrap.
+The project is in **Stage 5A: BigQuery Data Architecture & IaC Definition**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, and Stage 4 established the OpenTofu foundation.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, and an OpenTofu root module foundation. Application cloud resources, application features, and CI/CD workflows have not been created yet.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, and BigQuery RAW/CORE/MART dataset definitions. Stage 5B is still required before any BigQuery resources are provisioned.
 
 ## Project Goals
 
@@ -40,6 +40,7 @@ Canonical local quality checks are:
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Data Architecture](docs/data-architecture.md)
 - [Engineering Standards](docs/engineering-standards.md)
 - [Roadmap](docs/roadmap.md)
 - [Architectural Decisions](docs/decisions)

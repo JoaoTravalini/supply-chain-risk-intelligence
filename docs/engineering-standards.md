@@ -40,6 +40,11 @@ These standards define future project conventions. They are part of the Stage 0 
 - Avoid unrestricted LLM-generated DDL or DML.
 - Bound BigQuery queries through explicit limits, partition filters, projected columns, and cost-aware query design where appropriate.
 - Treat BigQuery as the analytical system of record, not as transactional state storage for agent execution.
+- Analytical layer boundaries must remain explicit across RAW, CORE, and MART.
+- Production consumers should not casually depend on RAW when validated CORE or business-facing MART data exists.
+- Future physical table designs must justify partitioning and clustering choices per table.
+- Destructive dataset behavior must be reviewed before infrastructure changes are applied.
+- BigQuery query bytes, quotas, and cost behavior are first-class design concerns.
 
 ## Security
 

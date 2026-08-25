@@ -2,7 +2,7 @@
 
 This directory contains the OpenTofu root module for SupplyChain Sentinel.
 
-Stage 4 establishes only the Infrastructure as Code foundation. It provisions zero Google Cloud resources.
+Stage 5A defines the BigQuery analytical dataset architecture in OpenTofu. It does not provision resources; Stage 5B will authenticate OpenTofu, review a real plan, and decide whether to apply the dataset definitions into BigQuery Sandbox.
 
 ## Requirements
 
@@ -26,7 +26,21 @@ The provider is configured only with:
 project = var.project_id
 ```
 
-Credentials, service-account key paths, billing accounts, regions, and zones are not configured in Stage 4.
+Credentials, service-account key paths, billing accounts, regions, and zones are not configured.
+
+## BigQuery Datasets
+
+The root module declares exactly three BigQuery datasets:
+
+- `supplychain_raw`
+- `supplychain_core`
+- `supplychain_mart`
+
+These datasets represent analytical boundaries only. No table resources, schemas, views, routines, dataset access blocks, IAM bindings, external connections, reservations, or encryption resources are defined in Stage 5A.
+
+The datasets are intended for BigQuery Sandbox during billing-free development. Sandbox validation does not cover production streaming behavior, because streaming is unavailable without billing.
+
+Datasets are persistent analytical boundaries. The module deliberately does not set `delete_contents_on_destroy = true`; accidental infrastructure destroy operations must not silently delete future dataset contents.
 
 ## Variables
 
@@ -37,6 +51,8 @@ cp terraform.tfvars.example terraform.tfvars
 ```
 
 Use a real project ID only in local, ignored files. Do not commit developer-specific project IDs, credentials, billing identifiers, or secrets.
+
+`bigquery_location` defaults to `US` for synthetic, non-sensitive portfolio development data. Future production deployment must review residency, service co-location, latency, and organizational requirements.
 
 ## State Strategy
 
@@ -68,3 +84,5 @@ tofu providers
 ```
 
 These commands are non-mutating with respect to cloud resources. `tofu init` may create local `.terraform/` files and `.terraform.lock.hcl`; `.terraform/` is ignored and `.terraform.lock.hcl` is versioned.
+
+Do not run `tofu apply` in Stage 5A. A real plan and any apply are deferred to Stage 5B.

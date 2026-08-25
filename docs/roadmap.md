@@ -38,4 +38,4 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-The project is currently in Stage 4: Infrastructure as Code Foundation. This stage establishes only the OpenTofu root module, provider lock, and IaC standards; resource definitions for BigQuery, Pub/Sub, Cloud Run, IAM, service accounts, Secret Manager, and application infrastructure remain deferred.
+The project is currently in Stage 5A: BigQuery Data Architecture & IaC Definition. This stage defines the RAW, CORE, and MART BigQuery datasets and documentation only; Stage 5B is still required for plan review, Sandbox provisioning, and cloud-state validation.

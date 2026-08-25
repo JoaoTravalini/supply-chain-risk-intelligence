@@ -38,4 +38,4 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-The project is currently in Stage 2: Quality Toolchain & Local Configuration. This stage establishes local Ruff, MyPy, Pytest, coverage, and pre-commit checks only.
+The project is currently in Stage 3: Billing-Free GCP Project Bootstrap. This stage documents and validates the manually created billing-free Google Cloud project only; BigQuery Sandbox, Pub/Sub emulator setup, managed cloud infrastructure, and application implementation remain deferred.

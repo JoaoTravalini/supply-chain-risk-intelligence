@@ -49,6 +49,18 @@ These standards define future project conventions. They are part of the Stage 0 
 - Apply least-privilege IAM.
 - Prefer separate workload identities for separate workloads.
 - Keep agent access to analytical datasets read-only unless an explicit design decision grants write access.
+- During the billing-free development phase, do not link a Cloud Billing Account to the project.
+- A future decision to enable billing requires explicit developer approval, service pricing review, security controls review, quota and limit review, and review of exposure to unintended charges.
+- Cloud Billing budgets may support monitoring and alerts, but they must not be treated as hard spending caps.
+
+## Billing-Free Development
+
+- BigQuery analytical development will initially use BigQuery Sandbox when introduced.
+- Pub/Sub development will initially use the local Google Cloud Pub/Sub emulator before any managed Pub/Sub deployment.
+- Python application services, Streamlit, and LangGraph will initially run locally during development.
+- PostgreSQL will use a local or explicitly free-tier development option when that stage arrives.
+- Cloud Run and other managed deployment infrastructure are deferred until a later deployment decision.
+- Local emulator and cloud adapters should remain behind explicit system boundaries so domain logic does not need to be rewritten for deployment.
 
 ## Observability
 

@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project is in **Stage 0: Architecture & Engineering Contract**. This stage defines the target architecture, engineering standards, roadmap, and major architectural decisions before implementation begins.
+The project is in **Stage 1: Python Project Bootstrap**. Stage 0 established the target architecture, engineering standards, roadmap, and major architectural decisions.
 
-No application code, dependency configuration, cloud resources, infrastructure code, tests, or CI/CD workflows have been created yet.
+The repository now contains the minimal Python package scaffold, project metadata, lockfile support, and a bootstrap import test. Cloud resources, infrastructure code, application features, and CI/CD workflows have not been created yet.
 
 ## Project Goals
 
@@ -34,4 +34,3 @@ The project favors deterministic business logic, explicit system boundaries, clo
 - [Engineering Standards](docs/engineering-standards.md)
 - [Roadmap](docs/roadmap.md)
 - [Architectural Decisions](docs/decisions)
-

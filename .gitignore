@@ -1,0 +1,22 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments and local caches
+.venv/
+.uv-cache/
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# Local environment and secret files
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db

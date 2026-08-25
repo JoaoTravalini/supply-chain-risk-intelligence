@@ -10,6 +10,9 @@ These standards define future project conventions. They are part of the Stage 0 
 
 ## Python and Type Safety
 
+- The current Python runtime baseline is Python 3.13.x.
+- Project metadata must constrain Python with `requires-python = ">=3.13,<3.14"`.
+- The project-level `.python-version` targets `3.13` and must not pin a patch release.
 - Use type hints for production Python code.
 - Prefer explicit data models at system boundaries.
 - Use Pydantic validation at system boundaries where external, serialized, or user-provided data enters the system.
@@ -68,4 +71,3 @@ These standards define future project conventions. They are part of the Stage 0 
 - Record major architecture changes as ADRs.
 - Do not change accepted target technology decisions without an explicit ADR.
 - Keep implementation details deferred until their planned stage when they have not yet been decided.
-

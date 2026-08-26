@@ -1,0 +1,138 @@
+{
+  "$defs": {
+    "Criticality": {
+      "description": "Operational impact if the supplier becomes unavailable.",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "title": "Criticality",
+      "type": "string"
+    },
+    "SupplierCategory": {
+      "description": "Approved Stage 7A supplier category taxonomy.",
+      "enum": [
+        "semiconductors",
+        "electronic_components",
+        "automotive_components",
+        "industrial_equipment",
+        "metals",
+        "chemicals",
+        "packaging",
+        "logistics"
+      ],
+      "title": "SupplierCategory",
+      "type": "string"
+    },
+    "SupplierLocation": {
+      "additionalProperties": false,
+      "description": "Stable supplier location used for future risk correlation.",
+      "properties": {
+        "city": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "City",
+          "type": "string"
+        },
+        "country_code": {
+          "pattern": "^[A-Z]{2}$",
+          "title": "Country Code",
+          "type": "string"
+        },
+        "latitude": {
+          "maximum": 90.0,
+          "minimum": -90.0,
+          "title": "Latitude",
+          "type": "number"
+        },
+        "longitude": {
+          "maximum": 180.0,
+          "minimum": -180.0,
+          "title": "Longitude",
+          "type": "number"
+        },
+        "region": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Region",
+          "type": "string"
+        }
+      },
+      "required": [
+        "country_code",
+        "region",
+        "city",
+        "latitude",
+        "longitude"
+      ],
+      "title": "SupplierLocation",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Immutable canonical supplier master-data contract.",
+  "properties": {
+    "annual_spend_usd": {
+      "exclusiveMinimum": 0,
+      "title": "Annual Spend Usd",
+      "type": "integer"
+    },
+    "category": {
+      "$ref": "#/$defs/SupplierCategory"
+    },
+    "criticality": {
+      "$ref": "#/$defs/Criticality"
+    },
+    "dependency_score": {
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Dependency Score",
+      "type": "number"
+    },
+    "location": {
+      "$ref": "#/$defs/SupplierLocation"
+    },
+    "name": {
+      "maxLength": 120,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "single_source": {
+      "title": "Single Source",
+      "type": "boolean"
+    },
+    "supplier_id": {
+      "pattern": "^SUP-\\d{6}$",
+      "title": "Supplier Id",
+      "type": "string"
+    },
+    "typical_lead_time_days": {
+      "exclusiveMinimum": 0,
+      "maximum": 365,
+      "title": "Typical Lead Time Days",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "supplier_id",
+    "name",
+    "category",
+    "criticality",
+    "location",
+    "annual_spend_usd",
+    "typical_lead_time_days",
+    "dependency_score",
+    "single_source"
+  ],
+  "title": "Supplier",
+  "type": "object"
+}

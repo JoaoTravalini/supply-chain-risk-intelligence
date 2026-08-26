@@ -48,6 +48,8 @@ The Canonical Event v1 contract now exists as the platform boundary for future s
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
+The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. The synthetic Supplier dataset is not generated yet, no physical CORE supplier table exists yet, and warehouse representation remains deferred. Stage 7B will create validated synthetic source data before physical table schemas are introduced.
+
 The analytical progression is intentionally one-way. Later stages may define controlled rebuild or replay workflows, but those workflows should preserve the same layer responsibilities.
 
 ## Provenance
@@ -70,6 +72,12 @@ RAW preserves source records and favors append-oriented semantics. CORE is the f
 Logical idempotency is based only on stable source identity fields, event type, and event time. Later enrichment, including supplier/entity correlation, must not redefine which source event a canonical record represents.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
+
+## Supplier Master Data
+
+Supplier master data describes relatively stable supplier attributes such as identity, location, category, criticality, annual exposure, lead-time expectation, dependency, and sourcing concentration.
+
+Dynamic operational performance does not belong in the Supplier master contract. Current risk score, delivery metrics, defect rates, weather risk, seismic risk, anomaly score, and current status metrics are deferred to operational observations, transformations, or risk analytics.
 
 ## Authoritative and Derived Data
 

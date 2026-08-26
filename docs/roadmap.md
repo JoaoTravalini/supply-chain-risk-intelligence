@@ -38,6 +38,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 6: Canonical Event Contract is complete. The Canonical Event v1 envelope, JSON Schema artifact, and contract tests are implemented. The RAW, CORE, and MART BigQuery Sandbox datasets remain provisioned and managed by OpenTofu with billing disabled, and no physical BigQuery tables exist yet.
+Stage 7A: Supplier Domain Contract is complete. The Supplier v1 master-data contract, JSON Schema artifact, and contract tests are implemented. The RAW, CORE, and MART BigQuery Sandbox datasets remain provisioned and managed by OpenTofu with billing disabled, and no physical BigQuery tables exist yet.
 
-The next stage is Stage 7: Supplier Domain + Synthetic Dataset. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.
+Stage 7 remains in progress. The next stage is Stage 7B: Deterministic Synthetic Supplier Dataset. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.

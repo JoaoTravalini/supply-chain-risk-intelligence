@@ -41,6 +41,13 @@ These standards define future project conventions. They are part of the Stage 0 
 - Entity enrichment must not redefine source-event identity.
 - Producer and source metadata must never contain credentials or secrets.
 
+## Domain Contracts
+
+- Canonical master-data contracts must be versioned and validated at system boundaries.
+- Master data and operational observations must remain separate.
+- Synthetic portfolio fixtures must be deterministic, reproducible, and generated without external network collection.
+- Generated domain data must pass the relevant domain contract validation before use.
+
 ## Data Access
 
 - Use parameterized SQL for dynamic values.
@@ -95,6 +102,7 @@ These standards define future project conventions. They are part of the Stage 0 
 ## Testing
 
 - Add tests with business logic changes.
+- Domain contract changes must include validation and schema drift tests.
 - Favor unit tests for deterministic domain behavior.
 - Use contract tests for adapters and event schemas.
 - Use integration tests where cloud, database, or messaging behavior must be verified.

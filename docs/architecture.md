@@ -68,8 +68,11 @@ can validate bounded nearby earthquake query results and canonicalize them into
 that can publish validated Canonical Events to `canonical-events-v1`. Stage 9B
 adds the canonical processing subscription `canonical-events-processing-v1` and
 a synchronous pull consumer that validates pulled message bodies back into
-Canonical Events. Provider data is not persisted yet. Processing idempotency,
-warehouse sinks, and BigQuery loading are not implemented yet.
+Canonical Events. Stage 10A adds pure processing assessment semantics for
+`NEW`, `DUPLICATE`, and `REVISION_CANDIDATE` using logical identity and
+source-content fingerprints. Provider data is not persisted yet. Persistent
+idempotency storage, revision ordering, warehouse sinks, and BigQuery loading are
+not implemented yet.
 
 Target flow:
 
@@ -84,6 +87,8 @@ External Provider
 -> canonical-events-processing-v1
 -> Pull consumer
 -> Validated Canonical Event
+-> Processing Assessment
+   -> NEW | DUPLICATE | REVISION_CANDIDATE
 -> Event processor
 -> BigQuery RAW
 -> BigQuery CORE

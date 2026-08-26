@@ -25,6 +25,9 @@ Stages may be subdivided if their scope becomes too large.
    - 9A. Local Pub/Sub Foundation & Canonical Event Publisher
    - 9B. Subscription / Pull Consumer Transport & Local End-to-End Messaging
 10. Event Processing + Idempotency + DLQ
+   - 10A. Processing Decision Contract & Source Content Fingerprints
+   - 10B. Persistent Idempotency Ledger & Revision-Aware Decisions
+   - 10C. Pub/Sub Processing Coordinator, Failure Policy & DLQ
 11. RAW -> CORE -> MART Transformations
 12. Deterministic Risk Engine
 
@@ -43,6 +46,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 9: Pub/Sub Messaging Pipeline is complete. Stage 9A added local Pub/Sub emulator safety configuration, deterministic Canonical Event serialization, derived message attributes, an emulator-only canonical topic bootstrap, and a Canonical Event publisher for `canonical-events-v1`. Stage 9B added the `canonical-events-processing-v1` pull subscription, Canonical Event deserialization, attribute integrity validation, synchronous pull consumer, explicit acknowledgement, and a redelivery transport primitive.
+Stage 10 is in progress. Stage 10A is complete and adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`.
 
-Provider data is not persisted. Processing idempotency, duplicate suppression, retry policy, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.
+Provider data is not persisted. The persistent idempotency ledger, revision ordering, stale-revision detection, processing conflict decisions, retry policy, ACK/NACK processing coordinator, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.

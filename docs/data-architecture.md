@@ -46,7 +46,7 @@ MART
 
 The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription.
 
-Pub/Sub is transport, not the system of record. Stage 9B does not load BigQuery, create physical RAW event tables, persist provider events, or implement ingestion processors. Future RAW and CORE ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, deduplication metadata, and provider revision semantics.
+Pub/Sub is transport, not the system of record. Stage 9B does not load BigQuery, create physical RAW event tables, persist provider events, or implement ingestion processors. Future RAW and CORE ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, deduplication metadata, source-content equality, and provider revision semantics.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
@@ -74,6 +74,10 @@ RAW preserves source records and favors append-oriented semantics. CORE is the f
 Logical idempotency is based only on stable source identity fields, event type, and event time. Later enrichment, including supplier/entity correlation, must not redefine which source event a canonical record represents.
 
 Source-event identity and source revision must remain distinct. For USGS, the stable provider Feature ID identifies the earthquake source event, while `source_updated_at` in the seismic payload identifies the freshness of the provider catalog revision represented by that record. Future RAW should preserve provider revisions, and future CORE processing must not treat a newer provider revision of the same logical earthquake as merely a meaningless at-least-once duplicate.
+
+Stage 10A introduces the source-content fingerprint as a separate deterministic concept from logical `deduplication_key`. Future RAW and CORE processing must preserve the distinction between the same logical source event with identical content and the same logical source event with changed content. Changed content with the same logical identity is a revision candidate, not something to discard blindly as a transport duplicate.
+
+Stage 10A does not persist processing decisions, create physical event tables, or write RAW/CORE records.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
 

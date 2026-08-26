@@ -39,6 +39,10 @@ These standards define future project conventions. They are part of the Stage 0 
 - Validate and normalize external data before publishing canonical events.
 - Canonical event timestamps must be timezone-aware and normalized to UTC.
 - Event instance identity and logical idempotency identity must remain separate.
+- Idempotency must use logical application identity, not Pub/Sub or other transport identity.
+- Exact duplicate detection requires both matching logical identity and stable source-content equality.
+- Mutable enrichment context, workflow lineage, producer metadata, ingestion time, and transport identifiers must not redefine source content identity.
+- Changed content with the same logical identity must be treated as a revision candidate until revision-aware processing determines ordering or disposition.
 - Canonical Events must always include stable source identity; source adapters own provider-specific natural-key derivation when native source IDs are absent.
 - Logical idempotency identity must use only stable source identity fields, event type, and event time.
 - Provider-derived source identities must exclude entity enrichment, correlation lineage, ingestion time, delivery identity, and measurement values unless a later provider contract explicitly changes that identity model.

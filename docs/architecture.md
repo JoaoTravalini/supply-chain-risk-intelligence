@@ -59,10 +59,16 @@ External data sources:
 - Synthetic operational supplier data.
 - Additional external sources only after explicit architectural review.
 
+Stage 8A provides the reusable synchronous HTTPS/JSON boundary that future
+external source adapters will use. Provider-specific adapters, source payload
+schemas, canonical event production, Pub/Sub publishing, and warehouse loading
+are not implemented yet.
+
 Target flow:
 
 ```text
 External Sources
+-> External HTTP boundary
 -> Cloud Run ingestion workload
 -> Canonical event validation and normalization
 -> Google Cloud Pub/Sub

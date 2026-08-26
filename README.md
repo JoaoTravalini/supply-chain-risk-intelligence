@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project has completed **Stage 5: BigQuery Data Architecture**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, and Stage 4 established the OpenTofu foundation.
+The project has completed **Stage 8A: External Integration Foundation**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, Stage 4 established the OpenTofu foundation, Stage 5 established the BigQuery data architecture, Stage 6 introduced the Canonical Event v1 contract, and Stage 7 introduced the Supplier v1 domain contract plus deterministic synthetic Supplier data.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, and a deterministic synthetic Supplier dataset. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Stage 8 will introduce external data adapters without implementing warehouse loading.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, a deterministic synthetic Supplier dataset, and a reusable synchronous HTTP boundary for future external adapters. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Provider-specific external adapters, Pub/Sub messaging, and warehouse loading remain deferred.
 
 ## Project Goals
 
@@ -43,6 +43,7 @@ Canonical local quality checks are:
 - [Data Architecture](docs/data-architecture.md)
 - [Engineering Standards](docs/engineering-standards.md)
 - [Canonical Event Contract](docs/contracts/canonical-event.md)
+- [External HTTP Boundary](docs/integrations/http-boundary.md)
 - [Supplier Domain Contract](docs/domain/supplier.md)
 - [Synthetic Supplier Dataset](docs/data/synthetic-suppliers.md)
 - [Roadmap](docs/roadmap.md)

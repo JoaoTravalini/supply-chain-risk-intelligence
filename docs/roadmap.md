@@ -18,6 +18,8 @@ Stages may be subdivided if their scope becomes too large.
 6. Canonical Event Contract
 7. Supplier Domain + Synthetic Dataset
 8. External Data Adapters
+   - 8A. External Integration Foundation
+   - 8B. Provider-Specific External Adapters
 9. Pub/Sub Messaging Pipeline
 10. Event Processing + Idempotency + DLQ
 11. RAW -> CORE -> MART Transformations
@@ -38,6 +40,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 7: Supplier Domain + Synthetic Dataset is complete. The Supplier v1 master-data contract, JSON Schema artifact, deterministic synthetic Supplier JSONL dataset, manifest, checksum, and validation tests are implemented. The RAW, CORE, and MART BigQuery Sandbox datasets remain provisioned and managed by OpenTofu with billing disabled, and no physical BigQuery tables exist yet.
+Stage 8A: External Integration Foundation is complete. The reusable synchronous HTTPS/JSON boundary, bounded timeout and retry policy, safe exception taxonomy, documentation, and tests are implemented.
 
-The next stage is Stage 8: External Data Adapters. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.
+Provider-specific external adapters are not implemented yet. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.

@@ -24,6 +24,8 @@ These standards define future project conventions. They are part of the Stage 0 
 - Keep domain logic independent from GCP SDKs, HTTP clients, database clients, and LLM provider SDKs.
 - Use dependency inversion for external providers.
 - Keep changes small and focused.
+- External HTTP access must use the project boundary wrapper, bounded timeouts, bounded retries, structured query parameters, HTTPS by default, and project-specific exceptions.
+- External source exceptions must preserve only safe context such as method, status, attempt count, and URL origin/path. Response bodies and query strings must not be stored in exception context.
 
 ## Events and Data Contracts
 

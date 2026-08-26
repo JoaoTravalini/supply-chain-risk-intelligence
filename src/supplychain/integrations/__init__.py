@@ -17,10 +17,19 @@ from supplychain.integrations.http import (
     RetryPolicy,
     TimeoutConfig,
 )
+from supplychain.integrations.open_meteo import (
+    OPEN_METEO_CURRENT_VARIABLES,
+    OPEN_METEO_FORECAST_ENDPOINT,
+    OpenMeteoWeatherAdapter,
+    generate_open_meteo_source_event_id,
+    normalize_open_meteo_coordinate,
+)
 
 __all__ = [
     "DEFAULT_USER_AGENT",
     "NON_RETRYABLE_STATUS_CODES",
+    "OPEN_METEO_CURRENT_VARIABLES",
+    "OPEN_METEO_FORECAST_ENDPOINT",
     "RETRYABLE_STATUS_CODES",
     "ExternalHttpClient",
     "ExternalSourceError",
@@ -29,7 +38,10 @@ __all__ = [
     "ExternalSourceTimeoutError",
     "ExternalSourceTransportError",
     "JsonObject",
+    "OpenMeteoWeatherAdapter",
     "QueryParams",
     "RetryPolicy",
     "TimeoutConfig",
+    "generate_open_meteo_source_event_id",
+    "normalize_open_meteo_coordinate",
 ]

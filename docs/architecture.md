@@ -59,15 +59,17 @@ External data sources:
 - Synthetic operational supplier data.
 - Additional external sources only after explicit architectural review.
 
-Stage 8A provides the reusable synchronous HTTPS/JSON boundary that future
-external source adapters will use. Provider-specific adapters, source payload
-schemas, canonical event production, Pub/Sub publishing, and warehouse loading
-are not implemented yet.
+Stage 8A provides the reusable synchronous HTTPS/JSON boundary that external
+source adapters use. Stage 8B adds the Open-Meteo current-weather adapter, which
+can validate one provider response and canonicalize it into
+`weather.observation.recorded`. Weather data is not persisted yet. USGS seismic
+integration, Pub/Sub publishing, and warehouse loading are not implemented yet.
 
 Target flow:
 
 ```text
-External Sources
+External Provider
+-> Provider Adapter
 -> External HTTP boundary
 -> Cloud Run ingestion workload
 -> Canonical event validation and normalization

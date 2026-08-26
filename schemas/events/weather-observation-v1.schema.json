@@ -1,0 +1,73 @@
+{
+  "additionalProperties": false,
+  "description": "Provider-independent canonical weather observation payload.",
+  "properties": {
+    "latitude": {
+      "maximum": 90.0,
+      "minimum": -90.0,
+      "title": "Latitude",
+      "type": "number"
+    },
+    "longitude": {
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "Longitude",
+      "type": "number"
+    },
+    "temperature_2m_c": {
+      "title": "Temperature 2M C",
+      "type": "number"
+    },
+    "relative_humidity_2m_pct": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Relative Humidity 2M Pct",
+      "type": "number"
+    },
+    "precipitation_mm": {
+      "minimum": 0.0,
+      "title": "Precipitation Mm",
+      "type": "number"
+    },
+    "rain_mm": {
+      "minimum": 0.0,
+      "title": "Rain Mm",
+      "type": "number"
+    },
+    "snowfall_cm": {
+      "minimum": 0.0,
+      "title": "Snowfall Cm",
+      "type": "number"
+    },
+    "weather_code": {
+      "maximum": 99,
+      "minimum": 0,
+      "title": "Weather Code",
+      "type": "integer"
+    },
+    "wind_speed_10m_kmh": {
+      "minimum": 0.0,
+      "title": "Wind Speed 10M Kmh",
+      "type": "number"
+    },
+    "wind_gusts_10m_kmh": {
+      "minimum": 0.0,
+      "title": "Wind Gusts 10M Kmh",
+      "type": "number"
+    }
+  },
+  "required": [
+    "latitude",
+    "longitude",
+    "temperature_2m_c",
+    "relative_humidity_2m_pct",
+    "precipitation_mm",
+    "rain_mm",
+    "snowfall_cm",
+    "weather_code",
+    "wind_speed_10m_kmh",
+    "wind_gusts_10m_kmh"
+  ],
+  "title": "WeatherObservationPayload",
+  "type": "object"
+}

@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project has completed **Stage 8A: External Integration Foundation**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, Stage 4 established the OpenTofu foundation, Stage 5 established the BigQuery data architecture, Stage 6 introduced the Canonical Event v1 contract, and Stage 7 introduced the Supplier v1 domain contract plus deterministic synthetic Supplier data.
+The project has completed **Stage 8B: Open-Meteo Weather Adapter**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, Stage 4 established the OpenTofu foundation, Stage 5 established the BigQuery data architecture, Stage 6 introduced the Canonical Event v1 contract, Stage 7 introduced the Supplier v1 domain contract plus deterministic synthetic Supplier data, and Stage 8A introduced the reusable external HTTP boundary.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, a deterministic synthetic Supplier dataset, and a reusable synchronous HTTP boundary for future external adapters. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Provider-specific external adapters, Pub/Sub messaging, and warehouse loading remain deferred.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, a deterministic synthetic Supplier dataset, a reusable synchronous HTTP boundary, and an Open-Meteo adapter that can canonicalize one current-weather observation into a Canonical Event. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Weather data is not persisted, Pub/Sub messaging is not implemented, and USGS seismic integration remains deferred.
 
 ## Project Goals
 
@@ -43,7 +43,9 @@ Canonical local quality checks are:
 - [Data Architecture](docs/data-architecture.md)
 - [Engineering Standards](docs/engineering-standards.md)
 - [Canonical Event Contract](docs/contracts/canonical-event.md)
+- [Weather Observation Contract](docs/contracts/weather-observation.md)
 - [External HTTP Boundary](docs/integrations/http-boundary.md)
+- [Open-Meteo Weather Adapter](docs/integrations/open-meteo.md)
 - [Supplier Domain Contract](docs/domain/supplier.md)
 - [Synthetic Supplier Dataset](docs/data/synthetic-suppliers.md)
 - [Roadmap](docs/roadmap.md)

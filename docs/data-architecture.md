@@ -44,7 +44,7 @@ Business Transformations
 MART
 ```
 
-The Canonical Event v1 contract now exists as the platform boundary for future source normalization. Pub/Sub messaging, physical RAW tables, and ingestion processors are not implemented yet.
+The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code. Pub/Sub messaging, physical RAW weather tables, weather persistence, and ingestion processors are not implemented yet.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 

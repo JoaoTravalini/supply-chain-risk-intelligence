@@ -19,7 +19,8 @@ Stages may be subdivided if their scope becomes too large.
 7. Supplier Domain + Synthetic Dataset
 8. External Data Adapters
    - 8A. External Integration Foundation
-   - 8B. Provider-Specific External Adapters
+   - 8B. Open-Meteo Weather Adapter
+   - 8C. USGS Seismic Adapter
 9. Pub/Sub Messaging Pipeline
 10. Event Processing + Idempotency + DLQ
 11. RAW -> CORE -> MART Transformations
@@ -40,6 +41,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 8A: External Integration Foundation is complete. The reusable synchronous HTTPS/JSON boundary, bounded timeout and retry policy, safe exception taxonomy, documentation, and tests are implemented.
+Stage 8B: Open-Meteo Weather Adapter is complete. The provider-independent WeatherObservationPayload contract, schema artifact, Open-Meteo current-weather adapter, deterministic provider source identity, Canonical Event mapping, documentation, and offline tests are implemented.
 
-Provider-specific external adapters are not implemented yet. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.
+USGS seismic integration is not implemented yet. Weather data is not persisted. Pub/Sub messaging, physical BigQuery weather tables, transformations, and risk scoring remain deferred.

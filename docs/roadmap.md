@@ -46,6 +46,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 10 is in progress. Stage 10A is complete and adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`.
+Stage 10 is in progress. Stage 10A is complete and adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`. Stage 10B is complete and adds the local persistent processing ledger, schema version 1, revision-marker extraction for USGS seismic events, and ledger-aware `NEW`, `DUPLICATE`, `NEWER_REVISION`, `STALE_REVISION`, and `REVISION_CONFLICT` resolution.
 
-Provider data is not persisted. The persistent idempotency ledger, revision ordering, stale-revision detection, processing conflict decisions, retry policy, ACK/NACK processing coordinator, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.
+Provider data is not persisted to RAW or CORE. The retry policy, ACK/NACK processing coordinator, poison-message handling, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE persistence, and risk scoring remain deferred.

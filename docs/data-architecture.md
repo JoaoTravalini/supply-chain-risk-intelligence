@@ -77,7 +77,9 @@ Source-event identity and source revision must remain distinct. For USGS, the st
 
 Stage 10A introduces the source-content fingerprint as a separate deterministic concept from logical `deduplication_key`. Future RAW and CORE processing must preserve the distinction between the same logical source event with identical content and the same logical source event with changed content. Changed content with the same logical identity is a revision candidate, not something to discard blindly as a transport duplicate.
 
-Stage 10A does not persist processing decisions, create physical event tables, or write RAW/CORE records.
+Stage 10B adds a local processing ledger. The ledger is not RAW and is not the analytical warehouse. It stores only idempotency/revision index metadata: logical key, source-content fingerprint, supported source revision marker, and safe event identity metadata. Full Canonical Events and source payloads will be persisted by future RAW architecture.
+
+The ledger prevents stale accepted revision state from overwriting a newer accepted revision for the same logical event. It does not define BigQuery table schemas, store RAW events, or write CORE records.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
 

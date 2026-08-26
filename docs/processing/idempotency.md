@@ -1,10 +1,11 @@
 # Processing Idempotency Semantics
 
-Stage 10A defines deterministic, side-effect-free processing semantics for
-Canonical Events after they are pulled and validated from the messaging boundary.
-It does not persist state, query storage, acknowledge Pub/Sub messages, request
-redelivery, retry processing, write BigQuery rows, or classify provider revision
-ordering.
+Stage 10A defines deterministic, side-effect-free identity and fingerprint
+semantics for Canonical Events after they are pulled and validated from the
+messaging boundary. Stage 10B adds a local persistent processing ledger that can
+resolve revision candidates where a supported source revision marker exists.
+Neither stage acknowledges Pub/Sub messages, requests redelivery, retries
+processing, writes BigQuery rows, or runs a worker coordinator.
 
 ## Logical Identity
 
@@ -102,10 +103,20 @@ assessment:
 Same `deduplication_key` plus different `source_content_fingerprint` means the
 same logical source event appears with changed source content.
 
-Stage 10A classifies this only as `REVISION_CANDIDATE`. It does not decide
-whether the content is newer, stale, corrected, conflicting, or authoritative.
-Stage 10B will resolve revision ordering where the provider exposes a usable
+Stage 10A classifies this only as `REVISION_CANDIDATE`. Stage 10B then resolves
+the candidate through the persistent ledger when the provider exposes a usable
 revision signal, such as USGS `source_updated_at`.
+
+The Stage 10B progression is:
+
+```text
+REVISION_CANDIDATE
+-> revision-aware ledger resolution
+-> NEWER_REVISION | STALE_REVISION | REVISION_CONFLICT
+```
+
+Stage 10B does not decide transport ACK/NACK behavior. Stage 10C will map
+processing outcomes and downstream success or failure to ACK/NACK policy.
 
 Conceptual example:
 
@@ -145,10 +156,11 @@ matching logical event exists.
 ## Stage Boundaries
 
 Stage 10A has no persistence. It is a pure local contract for how processing
-decisions are represented and calculated.
+identity and source-content equality are represented and calculated.
 
-Stage 10B will define the persistent idempotency ledger and revision-aware
-ordering decisions.
+Stage 10B defines the local persistent idempotency ledger and revision-aware
+ordering decisions. The ledger records successful processing state only through
+an explicit `record_success` operation.
 
 Stage 10C will define the processing coordinator, ACK/NACK policy, retry policy,
 poison-message handling, and DLQ behavior.

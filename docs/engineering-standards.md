@@ -58,6 +58,11 @@ These standards define future project conventions. They are part of the Stage 0 
 - Consumers must never derive authoritative Canonical Event values from Pub/Sub attributes.
 - Pulled Pub/Sub messages must not be automatically acknowledged by transport code.
 - Acknowledgement should occur only after an explicit caller decision.
+- Receiving or pulling a message does not mean the event was successfully processed.
+- Successful processing ledger mutation must occur only after downstream processing succeeds.
+- Stale provider revisions must not overwrite newer successfully accepted revision state.
+- Do not use last-arrival-wins behavior when provider revision ordering cannot be proven.
+- Revision conflicts must remain explicit when authoritative ordering cannot be established safely.
 - Application deduplication, retry, and revision-aware processing belong after the messaging transport boundary.
 
 ## Domain Contracts

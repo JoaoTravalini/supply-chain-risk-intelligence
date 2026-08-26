@@ -1,0 +1,83 @@
+{
+  "additionalProperties": false,
+  "description": "Provider-independent canonical seismic event payload.",
+  "properties": {
+    "latitude": {
+      "maximum": 90.0,
+      "minimum": -90.0,
+      "title": "Latitude",
+      "type": "number"
+    },
+    "longitude": {
+      "maximum": 180.0,
+      "minimum": -180.0,
+      "title": "Longitude",
+      "type": "number"
+    },
+    "depth_km": {
+      "maximum": 1000.0,
+      "minimum": -100.0,
+      "title": "Depth Km",
+      "type": "number"
+    },
+    "magnitude": {
+      "maximum": 10.0,
+      "minimum": -10.0,
+      "title": "Magnitude",
+      "type": "number"
+    },
+    "magnitude_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Magnitude Type"
+    },
+    "place": {
+      "minLength": 1,
+      "title": "Place",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "automatic",
+        "reviewed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "tsunami": {
+      "title": "Tsunami",
+      "type": "boolean"
+    },
+    "significance": {
+      "minimum": 0,
+      "title": "Significance",
+      "type": "integer"
+    },
+    "source_updated_at": {
+      "format": "date-time",
+      "title": "Source Updated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "latitude",
+    "longitude",
+    "depth_km",
+    "magnitude",
+    "place",
+    "status",
+    "tsunami",
+    "significance",
+    "source_updated_at"
+  ],
+  "title": "SeismicEventPayload",
+  "type": "object"
+}

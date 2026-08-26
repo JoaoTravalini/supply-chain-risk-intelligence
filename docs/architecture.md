@@ -62,8 +62,10 @@ External data sources:
 Stage 8A provides the reusable synchronous HTTPS/JSON boundary that external
 source adapters use. Stage 8B adds the Open-Meteo current-weather adapter, which
 can validate one provider response and canonicalize it into
-`weather.observation.recorded`. Weather data is not persisted yet. USGS seismic
-integration, Pub/Sub publishing, and warehouse loading are not implemented yet.
+`weather.observation.recorded`. Stage 8C adds the USGS seismic adapter, which
+can validate bounded nearby earthquake query results and canonicalize them into
+`seismic.event.detected`. Provider data is not persisted yet. Pub/Sub
+publishing and warehouse loading are not implemented yet.
 
 Target flow:
 

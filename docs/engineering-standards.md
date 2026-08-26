@@ -42,6 +42,7 @@ These standards define future project conventions. They are part of the Stage 0 
 - Canonical Events must always include stable source identity; source adapters own provider-specific natural-key derivation when native source IDs are absent.
 - Logical idempotency identity must use only stable source identity fields, event type, and event time.
 - Provider-derived source identities must exclude entity enrichment, correlation lineage, ingestion time, delivery identity, and measurement values unless a later provider contract explicitly changes that identity model.
+- When a provider exposes both stable event identity and revision/update time, adapters must preserve both concepts separately and must not fold revision time into logical deduplication identity.
 - Entity enrichment must not redefine source-event identity.
 - Producer and source metadata must never contain credentials or secrets.
 

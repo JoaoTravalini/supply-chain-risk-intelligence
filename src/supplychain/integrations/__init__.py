@@ -24,6 +24,14 @@ from supplychain.integrations.open_meteo import (
     generate_open_meteo_source_event_id,
     normalize_open_meteo_coordinate,
 )
+from supplychain.integrations.usgs import (
+    USGS_DEFAULT_LIMIT,
+    USGS_MAX_LIMIT,
+    USGS_MAX_RADIUS_KM,
+    USGS_QUERY_ENDPOINT,
+    UsgsSeismicAdapter,
+    format_usgs_datetime,
+)
 
 __all__ = [
     "DEFAULT_USER_AGENT",
@@ -31,6 +39,10 @@ __all__ = [
     "OPEN_METEO_CURRENT_VARIABLES",
     "OPEN_METEO_FORECAST_ENDPOINT",
     "RETRYABLE_STATUS_CODES",
+    "USGS_DEFAULT_LIMIT",
+    "USGS_MAX_LIMIT",
+    "USGS_MAX_RADIUS_KM",
+    "USGS_QUERY_ENDPOINT",
     "ExternalHttpClient",
     "ExternalSourceError",
     "ExternalSourceHttpError",
@@ -42,6 +54,8 @@ __all__ = [
     "QueryParams",
     "RetryPolicy",
     "TimeoutConfig",
+    "UsgsSeismicAdapter",
+    "format_usgs_datetime",
     "generate_open_meteo_source_event_id",
     "normalize_open_meteo_coordinate",
 ]

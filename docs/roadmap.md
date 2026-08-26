@@ -41,6 +41,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 8B: Open-Meteo Weather Adapter is complete. The provider-independent WeatherObservationPayload contract, schema artifact, Open-Meteo current-weather adapter, deterministic provider source identity, Canonical Event mapping, documentation, and offline tests are implemented.
+Stage 8: External Data Adapters is complete. The reusable HTTP boundary, provider-independent WeatherObservationPayload and SeismicEventPayload contracts, Open-Meteo current-weather adapter, USGS nearby-earthquake adapter, JSON Schema artifacts, Canonical Event mappings, documentation, and offline tests are implemented.
 
-USGS seismic integration is not implemented yet. Weather data is not persisted. Pub/Sub messaging, physical BigQuery weather tables, transformations, and risk scoring remain deferred.
+Provider data is not persisted. Pub/Sub messaging, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.

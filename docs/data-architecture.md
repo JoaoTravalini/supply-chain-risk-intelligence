@@ -44,7 +44,7 @@ Business Transformations
 MART
 ```
 
-The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code. Pub/Sub messaging, physical RAW weather tables, weather persistence, and ingestion processors are not implemented yet.
+The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Pub/Sub messaging, physical RAW external-event tables, provider-event persistence, and ingestion processors are not implemented yet.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
@@ -70,6 +70,8 @@ These are architectural concepts in Stage 5A. Physical columns and models are de
 RAW preserves source records and favors append-oriented semantics. CORE is the first analytical layer expected to contain deduplicated canonical records.
 
 Logical idempotency is based only on stable source identity fields, event type, and event time. Later enrichment, including supplier/entity correlation, must not redefine which source event a canonical record represents.
+
+Source-event identity and source revision must remain distinct. For USGS, the stable provider Feature ID identifies the earthquake source event, while `source_updated_at` in the seismic payload identifies the freshness of the provider catalog revision represented by that record. Future RAW should preserve provider revisions, and future CORE processing must not treat a newer provider revision of the same logical earthquake as merely a meaningless at-least-once duplicate.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
 

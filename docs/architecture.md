@@ -72,9 +72,12 @@ Canonical Events. Stage 10A adds pure processing assessment semantics for
 `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE` using logical identity and
 source-content fingerprints. Stage 10B adds a local persistent processing ledger
 that stores successful idempotency/revision state and resolves candidates into
-`NEWER_REVISION`, `STALE_REVISION`, or `REVISION_CONFLICT` when safe. Provider
-data is not persisted yet. The business processing coordinator, ACK/NACK policy,
-warehouse sinks, and BigQuery loading are not implemented yet.
+`NEWER_REVISION`, `STALE_REVISION`, or `REVISION_CONFLICT` when safe. Stage
+10C.1 adds a one-message processing coordinator that safely orders ledger
+assessment, handler execution, successful ledger mutation, and Pub/Sub ACK for
+already-valid Canonical Events. Provider data is not persisted yet. Retry
+policy, DLQ behavior, warehouse sinks, and BigQuery loading are not implemented
+yet.
 
 Target flow:
 
@@ -89,10 +92,13 @@ External Provider
 -> canonical-events-processing-v1
 -> Pull consumer
 -> Validated Canonical Event
--> Processing Assessment
-   -> NEW | DUPLICATE | REVISION_CANDIDATE
--> Persistent Processing Ledger
-   -> NEW | DUPLICATE | NEWER_REVISION | STALE_REVISION | REVISION_CONFLICT
+-> Processing Coordinator
+   -> Processing Assessment
+      -> NEW | DUPLICATE | REVISION_CANDIDATE
+   -> Persistent Processing Ledger
+      -> NEW | DUPLICATE | NEWER_REVISION | STALE_REVISION | REVISION_CONFLICT
+   -> Event handler
+   -> ACK decision
 -> Event processor
 -> BigQuery RAW
 -> BigQuery CORE
@@ -104,9 +110,9 @@ External Provider
 
 A dead-letter path must exist for unprocessable messaging events.
 
-The Stage 10B ledger is local and does not run a worker or acknowledge messages.
-Business processing coordination, retries, dead-letter handling, and
-Pub/Sub-to-BigQuery ingestion are not operational yet.
+The Stage 10B ledger is local. Stage 10C.1 adds one-message coordination for
+valid deliveries, but does not run a worker loop or define retry policy.
+Dead-letter handling and Pub/Sub-to-BigQuery ingestion are not operational yet.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 

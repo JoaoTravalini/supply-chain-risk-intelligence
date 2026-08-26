@@ -4,8 +4,9 @@ Stage 10A defines deterministic, side-effect-free identity and fingerprint
 semantics for Canonical Events after they are pulled and validated from the
 messaging boundary. Stage 10B adds a local persistent processing ledger that can
 resolve revision candidates where a supported source revision marker exists.
-Neither stage acknowledges Pub/Sub messages, requests redelivery, retries
-processing, writes BigQuery rows, or runs a worker coordinator.
+Stage 10C.1 adds a one-message coordinator for already-valid Canonical Events.
+Stage 10 does not handle malformed Pub/Sub payload recovery, request redelivery,
+retry processing, write BigQuery rows, route to a DLQ, or run a worker loop.
 
 ## Logical Identity
 
@@ -115,8 +116,11 @@ REVISION_CANDIDATE
 -> NEWER_REVISION | STALE_REVISION | REVISION_CONFLICT
 ```
 
-Stage 10B does not decide transport ACK/NACK behavior. Stage 10C will map
-processing outcomes and downstream success or failure to ACK/NACK policy.
+Stage 10C.1 maps valid Canonical Event ledger outcomes to safe ACK ordering.
+Duplicate and stale deliveries ACK without handler execution, new and newer
+revisions ACK only after handler success and ledger `record_success`, and
+revision conflicts do not ACK. Automatic NACK, redelivery, retry, and DLQ policy
+remain deferred.
 
 Conceptual example:
 
@@ -162,5 +166,6 @@ Stage 10B defines the local persistent idempotency ledger and revision-aware
 ordering decisions. The ledger records successful processing state only through
 an explicit `record_success` operation.
 
-Stage 10C will define the processing coordinator, ACK/NACK policy, retry policy,
-poison-message handling, and DLQ behavior.
+Stage 10C.1 defines the one-message processing coordinator and safe ACK ordering
+for valid Canonical Events. Automatic redelivery, retry policy, poison-message
+handling, and DLQ behavior remain deferred.

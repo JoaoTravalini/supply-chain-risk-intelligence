@@ -44,9 +44,9 @@ Business Transformations
 MART
 ```
 
-The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription.
+The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription. Stage 10C.1 can coordinate one already-valid received Canonical Event through ledger assessment, handler execution, successful ledger mutation, and ACK.
 
-Pub/Sub is transport, not the system of record. Stage 9B does not load BigQuery, create physical RAW event tables, persist provider events, or implement ingestion processors. Future RAW and CORE ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, deduplication metadata, source-content equality, and provider revision semantics.
+Pub/Sub is transport, not the system of record. Stage 10C.1 does not load BigQuery, create physical RAW event tables, persist provider events to the warehouse, implement worker loops, define retry policy, or route to a DLQ. Future RAW and CORE ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, deduplication metadata, source-content equality, and provider revision semantics.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
@@ -80,6 +80,10 @@ Stage 10A introduces the source-content fingerprint as a separate deterministic 
 Stage 10B adds a local processing ledger. The ledger is not RAW and is not the analytical warehouse. It stores only idempotency/revision index metadata: logical key, source-content fingerprint, supported source revision marker, and safe event identity metadata. Full Canonical Events and source payloads will be persisted by future RAW architecture.
 
 The ledger prevents stale accepted revision state from overwriting a newer accepted revision for the same logical event. It does not define BigQuery table schemas, store RAW events, or write CORE records.
+
+The Stage 10C.1 processing coordinator uses the ledger as the gate for safe
+handler execution and ACK. It is not a warehouse sink and does not change RAW,
+CORE, or MART physical design.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
 

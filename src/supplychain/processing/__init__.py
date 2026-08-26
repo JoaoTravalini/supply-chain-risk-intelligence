@@ -1,5 +1,12 @@
 """Public processing semantics for SupplyChain Sentinel."""
 
+from supplychain.processing.coordinator import (
+    CanonicalEventHandler,
+    CoordinatorOutcome,
+    MessageAcknowledger,
+    ProcessingCoordinator,
+    ProcessingCoordinatorResult,
+)
 from supplychain.processing.decisions import (
     ProcessedEventRecord,
     ProcessingAssessment,
@@ -27,10 +34,15 @@ __all__ = [
     "PROCESSED_EVENTS_TABLE",
     "SOURCE_CONTENT_FINGERPRINT_ALGORITHM",
     "SQLITE_LEDGER_SCHEMA_VERSION",
+    "CanonicalEventHandler",
+    "CoordinatorOutcome",
+    "MessageAcknowledger",
     "ProcessedEventRecord",
     "ProcessedLedgerRecord",
     "ProcessingAssessment",
     "ProcessingConsistencyError",
+    "ProcessingCoordinator",
+    "ProcessingCoordinatorResult",
     "ProcessingDecision",
     "ProcessingError",
     "ProcessingLedger",

@@ -27,8 +27,10 @@ pull
 ```
 
 Stage 10B implements only the ledger assessment and successful-state mutation.
-The processing coordinator, ACK/NACK policy, retry policy, poison-message
-handling, and DLQ behavior remain deferred to Stage 10C.
+Stage 10C.1 adds a one-message processing coordinator that orders assessment,
+handler execution, successful ledger mutation, and ACK for already-valid
+Canonical Events. Retry policy, poison-message handling, and DLQ behavior remain
+deferred.
 
 ## Architecture Boundary
 
@@ -167,5 +169,6 @@ out-of-order successful writes. A stale source revision cannot overwrite a newer
 accepted revision, and an exact duplicate is idempotent.
 
 The ledger does not create a distributed exactly-once transaction across future
-external side effects, BigQuery writes, or Pub/Sub acknowledgement. That broader
-coordination belongs to Stage 10C and later persistence architecture.
+external side effects, BigQuery writes, or Pub/Sub acknowledgement. Stage 10C.1
+adds safe local coordinator ordering, but broader retry, DLQ, and warehouse
+persistence coordination belongs to later processing architecture.

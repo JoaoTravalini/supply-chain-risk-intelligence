@@ -60,6 +60,11 @@ These standards define future project conventions. They are part of the Stage 0 
 - Acknowledgement should occur only after an explicit caller decision.
 - Receiving or pulling a message does not mean the event was successfully processed.
 - Successful processing ledger mutation must occur only after downstream processing succeeds.
+- For new or newer-revision valid events, processing order is ledger assessment, handler success, ledger `record_success`, then ACK.
+- Duplicate and stale-revision valid events may ACK without handler execution or ledger mutation.
+- Revision conflicts must not be ACKed until a later explicit failure policy exists.
+- Handler, ledger, and ACK failures must propagate without hidden retry or automatic redelivery policy unless a later stage defines that policy.
+- ACK failure after successful ledger mutation must not rollback ledger state or cause an in-process second handler attempt.
 - Stale provider revisions must not overwrite newer successfully accepted revision state.
 - Do not use last-arrival-wins behavior when provider revision ordering cannot be proven.
 - Revision conflicts must remain explicit when authoritative ordering cannot be established safely.

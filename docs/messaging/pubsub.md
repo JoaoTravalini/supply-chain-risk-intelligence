@@ -1,6 +1,6 @@
 # Pub/Sub Messaging
 
-SupplyChain Sentinel uses Google Cloud Pub/Sub as the event-driven messaging backbone for validated Canonical Events. Stage 9 implements the local-emulator foundation, one publisher path for `CanonicalEvent -> Pub/Sub`, one pull subscription, and a synchronous pull consumer. It does not implement warehouse ingestion, processing idempotency, retries, dead-letter handling, or long-running worker runtime.
+SupplyChain Sentinel uses Google Cloud Pub/Sub as the event-driven messaging backbone for validated Canonical Events. Stage 9 implements the local-emulator foundation, one publisher path for `CanonicalEvent -> Pub/Sub`, one pull subscription, and a synchronous pull consumer. Stage 10 adds local processing idempotency, revision-aware ledger resolution, and a one-message coordinator that ACKs only after safe ledger/handler ordering. It does not implement warehouse ingestion, retries, dead-letter handling, or long-running worker runtime.
 
 ## Topic Topology
 
@@ -100,6 +100,14 @@ The consumer:
 `ReceivedCanonicalEvent` contains the validated Canonical Event, Pub/Sub `message_id`, Pub/Sub `ack_id`, and optional delivery attempt when available. It does not expose the raw Google message object.
 
 Acknowledgement is explicit through the consumer acknowledgement API after downstream code decides processing is safe. A redelivery primitive is available by setting the acknowledgement deadline to zero, but it is only a transport operation. Stage 9 does not implement processing retry policy, backoff, DLQ routing, or automatic lease extension.
+
+Stage 10C.1 introduces `ProcessingCoordinator` for one already-valid
+`ReceivedCanonicalEvent`. For `NEW` and `NEWER_REVISION` ledger outcomes, the
+coordinator runs the handler, records successful ledger state, and only then
+ACKs. `DUPLICATE` and `STALE_REVISION` deliveries skip handler execution and
+ACK. `REVISION_CONFLICT` skips handler execution and does not ACK. The
+coordinator does not request redelivery, implement retry counters, run backoff,
+or route to a DLQ.
 
 ## Local Emulator Bootstrap
 

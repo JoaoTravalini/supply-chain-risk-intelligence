@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
 from uuid import UUID
 
 from google.api_core.exceptions import AlreadyExists, GoogleAPICallError, NotFound, RetryError
@@ -14,16 +14,23 @@ from google.cloud import pubsub_v1  # type: ignore[import-untyped]
 from supplychain.contracts import CanonicalEvent
 from supplychain.messaging.errors import (
     LocalPubSubEmulatorBootstrapError,
+    MessageAcknowledgeError,
     MessagePublishError,
     MessagePublishTimeoutError,
+    MessagePullError,
+    MessageRedeliveryRequestError,
 )
 from supplychain.messaging.serialization import (
     canonical_event_attributes,
+    deserialize_canonical_event,
     serialize_canonical_event,
+    validate_canonical_event_attributes,
 )
 from supplychain.messaging.topology import (
+    CANONICAL_EVENTS_SUBSCRIPTION_ID,
     CANONICAL_EVENTS_TOPIC_ID,
     LocalPubSubEmulatorConfig,
+    PubSubSubscriptionConfig,
     PubSubTopicConfig,
 )
 
@@ -54,6 +61,59 @@ class PublisherClient(Protocol):
         """Stop the owned publisher client."""
 
 
+class PubsubMessage(Protocol):
+    """Subset of a Pub/Sub message used by the pull consumer."""
+
+    data: bytes
+    attributes: Mapping[str, str]
+    message_id: str
+
+
+class ReceivedMessage(Protocol):
+    """Subset of a Pub/Sub received message used by the pull consumer."""
+
+    ack_id: str
+    message: PubsubMessage
+    delivery_attempt: int | None
+
+
+class PullResponse(Protocol):
+    """Subset of the Pub/Sub pull response."""
+
+    received_messages: Sequence[ReceivedMessage]
+
+
+class Subscription(Protocol):
+    """Subset of a Pub/Sub subscription resource."""
+
+    topic: str
+
+
+class SubscriberClient(Protocol):
+    """Subset of the Pub/Sub subscriber client used by Stage 9B."""
+
+    def subscription_path(self, project: str, subscription: str) -> str:
+        """Build the canonical Pub/Sub subscription path."""
+
+    def pull(self, request: Mapping[str, object], timeout: float) -> object:
+        """Pull messages from a subscription."""
+
+    def acknowledge(self, request: Mapping[str, object]) -> object:
+        """Acknowledge one or more delivery ack IDs."""
+
+    def modify_ack_deadline(self, request: Mapping[str, object]) -> object:
+        """Modify the acknowledgement deadline for one or more delivery ack IDs."""
+
+    def get_subscription(self, request: Mapping[str, str]) -> Subscription:
+        """Fetch a subscription by path."""
+
+    def create_subscription(self, request: Mapping[str, object]) -> Subscription:
+        """Create a subscription."""
+
+    def close(self) -> None:
+        """Close the owned subscriber client."""
+
+
 @dataclass(frozen=True, slots=True)
 class PublishReceipt:
     """Safe result returned after Pub/Sub acknowledges a publish."""
@@ -72,6 +132,30 @@ class LocalTopicBootstrapResult:
     topic_id: str
     topic_path: str
     created: bool
+
+
+@dataclass(frozen=True, slots=True)
+class LocalTopologyBootstrapResult:
+    """Safe result for local Pub/Sub emulator topic and subscription bootstrap."""
+
+    project_id: str
+    topic_id: str
+    topic_path: str
+    topic_created: bool
+    subscription_id: str
+    subscription_path: str
+    subscription_created: bool
+    ack_deadline_seconds: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReceivedCanonicalEvent:
+    """Project-owned representation of a pulled Canonical Event delivery."""
+
+    event: CanonicalEvent
+    message_id: str
+    ack_id: str
+    delivery_attempt: int | None = None
 
 
 class PubSubCanonicalEventPublisher:
@@ -136,6 +220,127 @@ class PubSubCanonicalEventPublisher:
         self.close()
 
 
+class PubSubCanonicalEventConsumer:
+    """Synchronously pull Canonical Events from one Pub/Sub subscription."""
+
+    def __init__(
+        self,
+        config: PubSubSubscriptionConfig,
+        *,
+        client: SubscriberClient | None = None,
+    ) -> None:
+        self._config = config
+        self._client = pubsub_v1.SubscriberClient() if client is None else client
+        self._owns_client = client is None
+        self._subscription_path = self._client.subscription_path(
+            config.project_id,
+            config.subscription_id,
+        )
+
+    @property
+    def subscription_path(self) -> str:
+        """Return the safe Pub/Sub subscription path used by this consumer."""
+
+        return self._subscription_path
+
+    def pull(
+        self,
+        *,
+        max_messages: int,
+        timeout_seconds: float | None = None,
+    ) -> tuple[ReceivedCanonicalEvent, ...]:
+        """Pull a bounded batch without acknowledging it."""
+
+        timeout = self._validate_pull_inputs(
+            max_messages=max_messages,
+            timeout_seconds=timeout_seconds,
+        )
+        try:
+            response = cast(
+                PullResponse,
+                self._client.pull(
+                    request={
+                        "subscription": self._subscription_path,
+                        "max_messages": max_messages,
+                    },
+                    timeout=timeout,
+                ),
+            )
+        except (GoogleAPICallError, RetryError) as exc:
+            raise MessagePullError(
+                "Pub/Sub pull failed",
+                project_id=self._config.project_id,
+                topic_path=self._subscription_path,
+            ) from exc
+        return tuple(_received_message_to_canonical(item) for item in response.received_messages)
+
+    def acknowledge(self, received_messages: tuple[ReceivedCanonicalEvent, ...]) -> None:
+        """Explicitly acknowledge pulled messages after caller validation/processing."""
+
+        ack_ids = _unique_ack_ids(received_messages)
+        if not ack_ids:
+            return
+        try:
+            self._client.acknowledge(
+                request={
+                    "subscription": self._subscription_path,
+                    "ack_ids": ack_ids,
+                },
+            )
+        except (GoogleAPICallError, RetryError) as exc:
+            raise MessageAcknowledgeError(
+                "Pub/Sub acknowledgement failed",
+                project_id=self._config.project_id,
+                topic_path=self._subscription_path,
+            ) from exc
+
+    def request_redelivery(self, received_messages: tuple[ReceivedCanonicalEvent, ...]) -> None:
+        """Request redelivery by setting the acknowledgement deadline to zero."""
+
+        ack_ids = _unique_ack_ids(received_messages)
+        if not ack_ids:
+            return
+        try:
+            self._client.modify_ack_deadline(
+                request={
+                    "subscription": self._subscription_path,
+                    "ack_ids": ack_ids,
+                    "ack_deadline_seconds": 0,
+                },
+            )
+        except (GoogleAPICallError, RetryError) as exc:
+            raise MessageRedeliveryRequestError(
+                "Pub/Sub redelivery request failed",
+                project_id=self._config.project_id,
+                topic_path=self._subscription_path,
+            ) from exc
+
+    def close(self) -> None:
+        """Close the owned Pub/Sub client; injected clients remain caller-owned."""
+
+        if self._owns_client:
+            self._client.close()
+
+    def __enter__(self) -> PubSubCanonicalEventConsumer:
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        self.close()
+
+    def _validate_pull_inputs(
+        self,
+        *,
+        max_messages: int,
+        timeout_seconds: float | None,
+    ) -> float:
+        if max_messages < 1 or max_messages > self._config.max_pull_messages_limit:
+            raise ValueError("max_messages must be positive and within the configured limit")
+        timeout = self._config.pull_timeout_seconds if timeout_seconds is None else timeout_seconds
+        if timeout <= 0:
+            raise ValueError("pull timeout must be positive and finite")
+        return timeout
+
+
 def ensure_local_pubsub_emulator_topic(
     *,
     config: LocalPubSubEmulatorConfig | None = None,
@@ -174,3 +379,92 @@ def ensure_local_pubsub_emulator_topic(
     finally:
         if owns_client:
             publisher_client.stop()
+
+
+def ensure_local_pubsub_emulator_topology(
+    *,
+    config: LocalPubSubEmulatorConfig | None = None,
+    publisher_client: PublisherClient | None = None,
+    subscriber_client: SubscriberClient | None = None,
+) -> LocalTopologyBootstrapResult:
+    """Idempotently ensure the Stage 9 topic and subscription exist locally."""
+
+    emulator_config = LocalPubSubEmulatorConfig.from_environment() if config is None else config
+    topic_result = ensure_local_pubsub_emulator_topic(
+        config=emulator_config,
+        client=publisher_client,
+    )
+    subscriber = pubsub_v1.SubscriberClient() if subscriber_client is None else subscriber_client
+    owns_subscriber = subscriber_client is None
+    subscription_path = subscriber.subscription_path(
+        emulator_config.project_id,
+        CANONICAL_EVENTS_SUBSCRIPTION_ID,
+    )
+    try:
+        try:
+            subscription = subscriber.get_subscription(request={"subscription": subscription_path})
+            if subscription.topic != topic_result.topic_path:
+                raise LocalPubSubEmulatorBootstrapError(
+                    "Local Pub/Sub emulator subscription is attached to an unexpected topic",
+                    project_id=emulator_config.project_id,
+                    topic_id=topic_result.topic_id,
+                    topic_path=topic_result.topic_path,
+                )
+            subscription_created = False
+        except NotFound:
+            subscriber.create_subscription(
+                request={
+                    "name": subscription_path,
+                    "topic": topic_result.topic_path,
+                    "ack_deadline_seconds": emulator_config.ack_deadline_seconds,
+                },
+            )
+            subscription_created = True
+        return LocalTopologyBootstrapResult(
+            project_id=emulator_config.project_id,
+            topic_id=topic_result.topic_id,
+            topic_path=topic_result.topic_path,
+            topic_created=topic_result.created,
+            subscription_id=CANONICAL_EVENTS_SUBSCRIPTION_ID,
+            subscription_path=subscription_path,
+            subscription_created=subscription_created,
+            ack_deadline_seconds=emulator_config.ack_deadline_seconds,
+        )
+    except LocalPubSubEmulatorBootstrapError:
+        raise
+    except (GoogleAPICallError, RetryError) as exc:
+        raise LocalPubSubEmulatorBootstrapError(
+            "Local Pub/Sub emulator subscription bootstrap failed",
+            project_id=emulator_config.project_id,
+            topic_id=topic_result.topic_id,
+            topic_path=topic_result.topic_path,
+        ) from exc
+    finally:
+        if owns_subscriber:
+            subscriber.close()
+
+
+def _received_message_to_canonical(message: ReceivedMessage) -> ReceivedCanonicalEvent:
+    event = deserialize_canonical_event(message.message.data)
+    attributes = dict(message.message.attributes)
+    validate_canonical_event_attributes(
+        event=event,
+        attributes=attributes,
+        message_id=message.message.message_id,
+    )
+    return ReceivedCanonicalEvent(
+        event=event,
+        message_id=message.message.message_id,
+        ack_id=message.ack_id,
+        delivery_attempt=message.delivery_attempt,
+    )
+
+
+def _unique_ack_ids(received_messages: tuple[ReceivedCanonicalEvent, ...]) -> list[str]:
+    ack_ids: list[str] = []
+    seen: set[str] = set()
+    for message in received_messages:
+        if message.ack_id not in seen:
+            ack_ids.append(message.ack_id)
+            seen.add(message.ack_id)
+    return ack_ids

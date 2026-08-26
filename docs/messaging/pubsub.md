@@ -1,6 +1,6 @@
 # Pub/Sub Messaging
 
-SupplyChain Sentinel uses Google Cloud Pub/Sub as the event-driven messaging backbone for validated Canonical Events. Stage 9A implements the local-emulator foundation and one publisher path for `CanonicalEvent -> Pub/Sub`; it does not implement subscriptions, consumers, warehouse ingestion, retries, dead-letter handling, or end-to-end processing.
+SupplyChain Sentinel uses Google Cloud Pub/Sub as the event-driven messaging backbone for validated Canonical Events. Stage 9 implements the local-emulator foundation, one publisher path for `CanonicalEvent -> Pub/Sub`, one pull subscription, and a synchronous pull consumer. It does not implement warehouse ingestion, processing idempotency, retries, dead-letter handling, or long-running worker runtime.
 
 ## Topic Topology
 
@@ -10,9 +10,15 @@ Stage 9 defines one canonical topic:
 canonical-events-v1
 ```
 
+Stage 9B defines one canonical processing subscription:
+
+```text
+canonical-events-processing-v1
+```
+
 The topic version aligns with the major generation of the Canonical Event contract. Weather, seismic, and supplier operational events share this topic because the Canonical Event envelope already carries `event_type`, source provenance, schema version, and processing metadata.
 
-Stage 9B owns the first subscription. No subscription is defined in Stage 9A.
+The subscription represents the generic canonical-event processing boundary. It does not imply BigQuery loading, risk calculation, provider-specific processing, or exactly-once business semantics.
 
 ## Message Body
 
@@ -26,7 +32,7 @@ Serialization uses:
 - compact deterministic separators
 - UTF-8 bytes
 
-The message body is authoritative. Pub/Sub attributes are only metadata, indexing, and routing hints derived from the validated body. Consumers must validate the message data and must not treat an attribute as more authoritative than the body.
+The message body is authoritative. Pub/Sub attributes are only metadata, indexing, and routing hints derived from the validated body. Consumers validate the message data as `CanonicalEvent` and must not treat an attribute as more authoritative than the body.
 
 ## Message Attributes
 
@@ -46,6 +52,8 @@ All attribute values are strings.
 
 Attributes must not contain the full payload, raw provider responses, coordinates, source endpoint query strings, credentials, secrets, arbitrary entity data, or ingestion debug dumps. The normal publisher API does not accept caller-supplied arbitrary attributes, preventing metadata that contradicts the event body.
 
+The Stage 9B consumer requires the standard publisher attributes and validates them against the deserialized Canonical Event. Attribute mismatches fail with a project-owned integrity error. Unknown extra attributes are ignored and do not become application data.
+
 ## Identity Semantics
 
 Pub/Sub `message_id` is the transport-assigned identity for one published message.
@@ -54,13 +62,15 @@ Canonical `event_id` is the canonical event instance identity generated before t
 
 `deduplication_key` is the stable logical event identity for future application idempotency.
 
-These identifiers are distinct. The publisher does not derive `event_id` from Pub/Sub `message_id`, does not use `message_id` as the application deduplication key, and does not use `event_id` as a transport message ID.
+`ack_id` is the transport acknowledgement handle for one pulled delivery.
+
+These identifiers are distinct. The publisher does not derive `event_id` from Pub/Sub `message_id`, does not use `message_id` as the application deduplication key, and does not use `event_id` as a transport message ID. The consumer does not use `message_id` or `ack_id` as business identity.
 
 ## Delivery And Ordering
 
-The architecture assumes at-least-once delivery. Stage 9A does not provide exactly-once application processing, duplicate suppression, retries, revision handling, or dead-letter behavior. Stage 10 owns explicit application idempotency, retry, revision, and DLQ semantics.
+The architecture assumes at-least-once delivery. The same Canonical Event may be delivered more than once. Stage 9 does not deduplicate and does not maintain in-memory seen-ID state. Stage 10 owns explicit application idempotency, retry, revision, poison-message, and DLQ semantics.
 
-Stage 9A does not use Pub/Sub ordering keys. Ordering may be introduced later only for a clearly defined entity or source sequencing requirement.
+Stage 9 does not use Pub/Sub ordering keys. Ordering may be introduced later only for a clearly defined entity or source sequencing requirement.
 
 ## Publisher Behavior
 
@@ -73,10 +83,28 @@ Stage 9A does not use Pub/Sub ordering keys. Ordering may be introduced later on
 
 The publisher creates no topics. It maps expected Pub/Sub publish failures into project-owned messaging exceptions without storing message bodies in error text.
 
+## Pull Consumer Behavior
+
+`PubSubCanonicalEventConsumer` performs bounded synchronous pulls from `canonical-events-processing-v1`.
+
+The consumer:
+
+- uses a finite pull timeout;
+- validates `max_messages`;
+- returns immutable `ReceivedCanonicalEvent` objects;
+- validates message data as authoritative Canonical Events;
+- validates standard attributes against the body;
+- preserves Pub/Sub receive order;
+- does not automatically acknowledge messages.
+
+`ReceivedCanonicalEvent` contains the validated Canonical Event, Pub/Sub `message_id`, Pub/Sub `ack_id`, and optional delivery attempt when available. It does not expose the raw Google message object.
+
+Acknowledgement is explicit through the consumer acknowledgement API after downstream code decides processing is safe. A redelivery primitive is available by setting the acknowledgement deadline to zero, but it is only a transport operation. Stage 9 does not implement processing retry policy, backoff, DLQ routing, or automatic lease extension.
+
 ## Local Emulator Bootstrap
 
-Local development may bootstrap emulator resources programmatically. The Stage 9A bootstrap operation is explicitly local-emulator-only and ensures `canonical-events-v1` exists in the emulator idempotently.
+Local development may bootstrap emulator resources programmatically. The Stage 9 bootstrap operation is explicitly local-emulator-only and ensures `canonical-events-v1` and `canonical-events-processing-v1` exist in the emulator idempotently.
 
 The bootstrap guard requires `PUBSUB_EMULATOR_HOST` and `PUBSUB_PROJECT_ID`. The emulator host must be a loopback target such as `127.0.0.1:<port>`, `localhost:<port>`, or `[::1]:<port>`.
 
-Future real cloud Pub/Sub resources must be provisioned through OpenTofu/IaC, not implicitly created by application startup. Stage 9A adds no real Pub/Sub infrastructure.
+Future real cloud Pub/Sub resources must be provisioned through OpenTofu/IaC, not implicitly created by application startup. Stage 9 adds no real Pub/Sub infrastructure.

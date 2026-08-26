@@ -44,9 +44,9 @@ Business Transformations
 MART
 ```
 
-The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9A allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic.
+The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription.
 
-Pub/Sub is not the system of record. Stage 9A does not load BigQuery, create physical RAW event tables, persist provider events, or implement ingestion processors. Future RAW ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, and deduplication metadata.
+Pub/Sub is transport, not the system of record. Stage 9B does not load BigQuery, create physical RAW event tables, persist provider events, or implement ingestion processors. Future RAW and CORE ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, deduplication metadata, and provider revision semantics.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 

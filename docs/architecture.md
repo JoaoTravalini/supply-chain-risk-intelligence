@@ -65,9 +65,11 @@ can validate one provider response and canonicalize it into
 `weather.observation.recorded`. Stage 8C adds the USGS seismic adapter, which
 can validate bounded nearby earthquake query results and canonicalize them into
 `seismic.event.detected`. Stage 9A adds a local-emulator-only Pub/Sub publisher
-that can publish validated Canonical Events to `canonical-events-v1`. Provider
-data is not persisted yet. Pub/Sub subscriptions, event processing, and
-warehouse loading are not implemented yet.
+that can publish validated Canonical Events to `canonical-events-v1`. Stage 9B
+adds the canonical processing subscription `canonical-events-processing-v1` and
+a synchronous pull consumer that validates pulled message bodies back into
+Canonical Events. Provider data is not persisted yet. Processing idempotency,
+warehouse sinks, and BigQuery loading are not implemented yet.
 
 Target flow:
 
@@ -79,6 +81,9 @@ External Provider
 -> Canonical event validation and normalization
 -> Pub/Sub Publisher
 -> canonical-events-v1
+-> canonical-events-processing-v1
+-> Pull consumer
+-> Validated Canonical Event
 -> Event processor
 -> BigQuery RAW
 -> BigQuery CORE
@@ -90,8 +95,8 @@ External Provider
 
 A dead-letter path must exist for unprocessable messaging events.
 
-Subscriber and processing workloads are not implemented yet. Pub/Sub-to-BigQuery
-ingestion is not operational in Stage 9A.
+Processing, idempotency, retries, dead-letter handling, and Pub/Sub-to-BigQuery
+ingestion are not operational in Stage 9B.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 

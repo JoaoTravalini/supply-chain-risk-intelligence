@@ -31,6 +31,13 @@ Test-NetConnection 127.0.0.1 -Port 8085
 
 Application/bootstrap code creates emulator resources. Do not use `gcloud pubsub` to create project resources for this local stage.
 
+The local bootstrap can ensure:
+
+- topic: `canonical-events-v1`
+- subscription: `canonical-events-processing-v1`
+
+If the emulator is restarted, these resources must be bootstrapped again because emulator state is ephemeral.
+
 ## Safety Rules
 
 - The emulator must be restarted after closing Terminal A.

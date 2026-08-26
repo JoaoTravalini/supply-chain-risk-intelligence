@@ -38,3 +38,34 @@ class MessagePublishError(MessagingError):
 
 class MessagePublishTimeoutError(MessagePublishError):
     """Publishing a canonical event did not acknowledge before the timeout."""
+
+
+class MessageDeserializationError(MessagingError):
+    """Message data could not be decoded and validated as a Canonical Event."""
+
+
+class MessageAttributeMismatchError(MessagingError):
+    """Message attributes disagree with the authoritative Canonical Event body."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        attribute: str,
+        message_id: str | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.attribute = attribute
+        self.message_id = message_id
+
+
+class MessagePullError(MessagingError):
+    """Pulling messages from Pub/Sub failed."""
+
+
+class MessageAcknowledgeError(MessagingError):
+    """Acknowledging Pub/Sub messages failed."""
+
+
+class MessageRedeliveryRequestError(MessagingError):
+    """Requesting Pub/Sub redelivery failed."""

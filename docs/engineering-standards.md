@@ -51,6 +51,10 @@ These standards define future project conventions. They are part of the Stage 0 
 - Real cloud messaging resources must be managed through IaC rather than application startup.
 - Local messaging emulator bootstrap must fail closed when emulator configuration is missing or unsafe.
 - Message attributes must be derived from validated events and must not duplicate arbitrary payload or unsafe metadata.
+- Consumers must never derive authoritative Canonical Event values from Pub/Sub attributes.
+- Pulled Pub/Sub messages must not be automatically acknowledged by transport code.
+- Acknowledgement should occur only after an explicit caller decision.
+- Application deduplication, retry, and revision-aware processing belong after the messaging transport boundary.
 
 ## Domain Contracts
 

@@ -5,7 +5,7 @@ import json
 from collections.abc import Mapping
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from datetime import UTC, datetime
-from typing import ClassVar
+from typing import ClassVar, cast
 from uuid import UUID
 
 import pytest
@@ -19,19 +19,31 @@ from supplychain.contracts import (
     generate_deduplication_key,
 )
 from supplychain.messaging import (
+    CANONICAL_EVENTS_SUBSCRIPTION_ID,
     CANONICAL_EVENTS_TOPIC_ID,
+    DEFAULT_ACK_DEADLINE_SECONDS,
     LOCAL_PUBSUB_PROJECT_ID,
     MESSAGE_CONTENT_TYPE,
     LocalPubSubEmulatorConfig,
     LocalPubSubEmulatorConfigurationError,
+    MessageAcknowledgeError,
+    MessageAttributeMismatchError,
+    MessageDeserializationError,
     MessagePublishError,
     MessagePublishTimeoutError,
+    MessagePullError,
+    MessageRedeliveryRequestError,
+    PubSubCanonicalEventConsumer,
     PubSubCanonicalEventPublisher,
+    PubSubSubscriptionConfig,
     PubSubTopicConfig,
     canonical_event_attributes,
+    deserialize_canonical_event,
     ensure_local_pubsub_emulator_topic,
+    ensure_local_pubsub_emulator_topology,
     is_loopback_emulator_host,
     serialize_canonical_event,
+    validate_canonical_event_attributes,
 )
 
 
@@ -100,6 +112,104 @@ class FakePublisherClient:
         self.stopped = True
 
 
+class FakePubsubMessage:
+    def __init__(
+        self,
+        *,
+        data: bytes,
+        attributes: Mapping[str, str],
+        message_id: str,
+    ) -> None:
+        self.data = data
+        self.attributes = attributes
+        self.message_id = message_id
+
+
+class FakeReceivedMessage:
+    def __init__(
+        self,
+        *,
+        ack_id: str,
+        message: FakePubsubMessage,
+        delivery_attempt: int | None = None,
+    ) -> None:
+        self.ack_id = ack_id
+        self.message = message
+        self.delivery_attempt = delivery_attempt
+
+
+class FakePullResponse:
+    def __init__(self, received_messages: list[FakeReceivedMessage]) -> None:
+        self.received_messages: tuple[FakeReceivedMessage, ...] = tuple(received_messages)
+
+
+class FakeSubscription:
+    def __init__(self, *, topic: str) -> None:
+        self.topic = topic
+
+
+class FakeSubscriberClient:
+    def __init__(
+        self,
+        *,
+        received_messages: list[FakeReceivedMessage] | None = None,
+        pull_error: GoogleAPICallError | None = None,
+        acknowledge_error: GoogleAPICallError | None = None,
+        nack_error: GoogleAPICallError | None = None,
+        subscription_exists: bool = True,
+        subscription_topic: str = "projects/supplychain-local/topics/canonical-events-v1",
+    ) -> None:
+        self.received_messages = [] if received_messages is None else received_messages
+        self.pull_error = pull_error
+        self.acknowledge_error = acknowledge_error
+        self.nack_error = nack_error
+        self.subscription_exists = subscription_exists
+        self.subscription_topic = subscription_topic
+        self.pull_requests: list[Mapping[str, object]] = []
+        self.pull_timeouts: list[float] = []
+        self.acknowledge_requests: list[Mapping[str, object]] = []
+        self.nack_requests: list[Mapping[str, object]] = []
+        self.get_subscription_requests: list[Mapping[str, str]] = []
+        self.create_subscription_requests: list[Mapping[str, object]] = []
+        self.closed = False
+
+    def subscription_path(self, project: str, subscription: str) -> str:
+        return f"projects/{project}/subscriptions/{subscription}"
+
+    def pull(self, request: Mapping[str, object], timeout: float) -> FakePullResponse:
+        if self.pull_error is not None:
+            raise self.pull_error
+        self.pull_requests.append(request)
+        self.pull_timeouts.append(timeout)
+        return FakePullResponse(self.received_messages)
+
+    def acknowledge(self, request: Mapping[str, object]) -> object:
+        if self.acknowledge_error is not None:
+            raise self.acknowledge_error
+        self.acknowledge_requests.append(request)
+        return object()
+
+    def modify_ack_deadline(self, request: Mapping[str, object]) -> object:
+        if self.nack_error is not None:
+            raise self.nack_error
+        self.nack_requests.append(request)
+        return object()
+
+    def get_subscription(self, request: Mapping[str, str]) -> FakeSubscription:
+        self.get_subscription_requests.append(request)
+        if not self.subscription_exists:
+            raise NotFound("missing subscription")  # type: ignore[no-untyped-call]
+        return FakeSubscription(topic=self.subscription_topic)
+
+    def create_subscription(self, request: Mapping[str, object]) -> FakeSubscription:
+        self.create_subscription_requests.append(request)
+        self.subscription_exists = True
+        return FakeSubscription(topic=cast(str, request["topic"]))
+
+    def close(self) -> None:
+        self.closed = True
+
+
 def make_event(*, source_endpoint: str | None = "synthetic://supplier/snapshot") -> CanonicalEvent:
     event_time = datetime(2026, 8, 26, 12, 0, tzinfo=UTC)
     source = SourceMetadata(
@@ -123,6 +233,27 @@ def make_event(*, source_endpoint: str | None = "synthetic://supplier/snapshot")
                 event_type=EventType.SUPPLIER_OPERATIONAL_SNAPSHOT_RECORDED,
                 event_time=event_time,
             ),
+        ),
+    )
+
+
+def make_received_message(
+    *,
+    event: CanonicalEvent | None = None,
+    attributes: dict[str, str] | None = None,
+    message_id: str = "transport-message-001",
+    ack_id: str = "ack-001",
+) -> FakeReceivedMessage:
+    canonical_event = make_event() if event is None else event
+    message_attributes = (
+        canonical_event_attributes(canonical_event) if attributes is None else attributes
+    )
+    return FakeReceivedMessage(
+        ack_id=ack_id,
+        message=FakePubsubMessage(
+            data=serialize_canonical_event(canonical_event),
+            attributes=message_attributes,
+            message_id=message_id,
         ),
     )
 
@@ -477,3 +608,435 @@ def test_bootstrap_cannot_target_real_cloud_fallback() -> None:
             ),
             client=FakePublisherClient(),
         )
+
+
+def test_canonical_subscription_id_is_approved_topology_value() -> None:
+    assert CANONICAL_EVENTS_SUBSCRIPTION_ID == "canonical-events-processing-v1"
+
+
+def test_subscription_targets_canonical_topic() -> None:
+    publisher_client = FakePublisherClient()
+    subscriber_client = FakeSubscriberClient(subscription_exists=False)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=publisher_client,
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.subscription_id == CANONICAL_EVENTS_SUBSCRIPTION_ID
+    assert subscriber_client.create_subscription_requests[0]["topic"] == result.topic_path
+
+
+def test_absent_subscription_is_created() -> None:
+    subscriber_client = FakeSubscriberClient(subscription_exists=False)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.subscription_created is True
+    assert subscriber_client.create_subscription_requests[0]["name"] == (
+        "projects/supplychain-local/subscriptions/canonical-events-processing-v1"
+    )
+
+
+def test_existing_correct_subscription_is_idempotent() -> None:
+    subscriber_client = FakeSubscriberClient(subscription_exists=True)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.subscription_created is False
+    assert subscriber_client.create_subscription_requests == []
+
+
+def test_existing_subscription_with_unexpected_topic_fails_safely() -> None:
+    with pytest.raises(Exception) as exc_info:
+        ensure_local_pubsub_emulator_topology(
+            config=LocalPubSubEmulatorConfig(
+                emulator_host="127.0.0.1:8085",
+                project_id=LOCAL_PUBSUB_PROJECT_ID,
+            ),
+            publisher_client=FakePublisherClient(),
+            subscriber_client=FakeSubscriberClient(
+                subscription_topic="projects/other/topics/wrong"
+            ),
+        )
+
+    assert "unexpected topic" in str(exc_info.value)
+
+
+def test_topology_bootstrap_remains_blocked_without_emulator_config() -> None:
+    with pytest.raises(LocalPubSubEmulatorConfigurationError):
+        ensure_local_pubsub_emulator_topology(
+            config=LocalPubSubEmulatorConfig.from_environment({}),
+            publisher_client=FakePublisherClient(),
+            subscriber_client=FakeSubscriberClient(),
+        )
+
+
+def test_subscription_bootstrap_does_not_configure_advanced_features() -> None:
+    subscriber_client = FakeSubscriberClient(subscription_exists=False)
+
+    ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    request = subscriber_client.create_subscription_requests[0]
+    assert request["ack_deadline_seconds"] == DEFAULT_ACK_DEADLINE_SECONDS
+    assert "dead_letter_policy" not in request
+    assert "retry_policy" not in request
+    assert "enable_exactly_once_delivery" not in request
+    assert "enable_message_ordering" not in request
+    assert "filter" not in request
+
+
+def test_valid_serialized_canonical_event_deserializes() -> None:
+    event = make_event()
+
+    assert deserialize_canonical_event(serialize_canonical_event(event)) == event
+
+
+def test_invalid_utf8_deserialization_fails_safely() -> None:
+    with pytest.raises(MessageDeserializationError):
+        deserialize_canonical_event(b"\xff")
+
+
+def test_malformed_json_deserialization_fails_safely() -> None:
+    with pytest.raises(MessageDeserializationError):
+        deserialize_canonical_event(b"{")
+
+
+def test_invalid_canonical_event_json_fails_safely() -> None:
+    with pytest.raises(MessageDeserializationError):
+        deserialize_canonical_event(b'{"not":"an event"}')
+
+
+def test_deserialization_does_not_use_attributes() -> None:
+    event = deserialize_canonical_event(serialize_canonical_event(make_event()))
+
+    assert event.event_type is EventType.SUPPLIER_OPERATIONAL_SNAPSHOT_RECORDED
+
+
+def test_serialization_to_deserialization_preserves_contract_values() -> None:
+    event = make_event()
+    round_tripped = deserialize_canonical_event(serialize_canonical_event(event))
+
+    assert round_tripped.model_dump(mode="json") == event.model_dump(mode="json")
+
+
+def test_valid_publisher_attributes_match_body() -> None:
+    event = make_event()
+
+    validate_canonical_event_attributes(event=event, attributes=canonical_event_attributes(event))
+
+
+@pytest.mark.parametrize(
+    ("attribute", "value"),
+    [
+        ("event_id", "c0a2a352-67b8-4dc6-863e-c3e5d45b8c36"),
+        ("event_type", "seismic.event.detected"),
+        ("schema_version", "9.9.9"),
+        ("source_provider", "other-provider"),
+        ("deduplication_key", "bad-dedup-key"),
+        ("correlation_id", "corr-other"),
+        ("producer", "other-producer"),
+        ("producer_version", "9.9.9"),
+        ("content_type", "text/plain"),
+    ],
+)
+def test_standard_attribute_mismatch_is_rejected(attribute: str, value: str) -> None:
+    event = make_event()
+    attrs = canonical_event_attributes(event)
+    attrs[attribute] = value
+
+    with pytest.raises(MessageAttributeMismatchError) as exc_info:
+        validate_canonical_event_attributes(event=event, attributes=attrs)
+
+    assert exc_info.value.attribute == attribute
+
+
+def test_missing_standard_attribute_is_rejected() -> None:
+    event = make_event()
+    attrs = canonical_event_attributes(event)
+    del attrs["content_type"]
+
+    with pytest.raises(MessageAttributeMismatchError):
+        validate_canonical_event_attributes(event=event, attributes=attrs)
+
+
+def test_extra_transport_attributes_do_not_enter_canonical_event() -> None:
+    event = make_event()
+    attrs = canonical_event_attributes(event)
+    attrs["extra"] = "ignored"
+    message = make_received_message(event=event, attributes=attrs)
+
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(received_messages=[message]),
+    ).pull(max_messages=1)
+
+    assert received[0].event == event
+    assert "extra" not in received[0].event.model_dump(mode="json")
+
+
+def test_pull_uses_correct_canonical_subscription_path() -> None:
+    client = FakeSubscriberClient()
+
+    PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    ).pull(max_messages=1)
+
+    assert client.pull_requests[0]["subscription"] == (
+        "projects/supplychain-local/subscriptions/canonical-events-processing-v1"
+    )
+
+
+def test_pull_passes_configured_max_messages() -> None:
+    client = FakeSubscriberClient()
+
+    PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    ).pull(max_messages=7)
+
+    assert client.pull_requests[0]["max_messages"] == 7
+
+
+def test_pull_uses_finite_rpc_timeout() -> None:
+    client = FakeSubscriberClient()
+
+    PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID, pull_timeout_seconds=4.0),
+        client=client,
+    ).pull(max_messages=1)
+
+    assert client.pull_timeouts == [4.0]
+
+
+def test_pull_rejects_invalid_inputs() -> None:
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(),
+    )
+
+    with pytest.raises(ValueError):
+        consumer.pull(max_messages=0)
+    with pytest.raises(ValueError):
+        consumer.pull(max_messages=1, timeout_seconds=0)
+
+
+def test_zero_pulled_messages_returns_empty_tuple() -> None:
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(),
+    ).pull(max_messages=1)
+
+    assert received == ()
+
+
+def test_one_valid_message_becomes_received_canonical_event() -> None:
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(received_messages=[make_received_message()]),
+    ).pull(max_messages=1)
+
+    assert len(received) == 1
+    assert received[0].event == make_event()
+
+
+def test_multiple_valid_messages_preserve_receive_order() -> None:
+    first = make_received_message(message_id="message-1", ack_id="ack-1")
+    second = make_received_message(message_id="message-2", ack_id="ack-2")
+
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(received_messages=[first, second]),
+    ).pull(max_messages=2)
+
+    assert [item.message_id for item in received] == ["message-1", "message-2"]
+
+
+def test_transport_message_id_and_ack_id_are_preserved() -> None:
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(
+            received_messages=[make_received_message(message_id="msg-123", ack_id="ack-123")]
+        ),
+    ).pull(max_messages=1)
+
+    assert received[0].message_id == "msg-123"
+    assert received[0].ack_id == "ack-123"
+
+
+def test_canonical_event_id_remains_separate_from_transport_message_id() -> None:
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(
+            received_messages=[make_received_message(message_id="transport-123")]
+        ),
+    ).pull(max_messages=1)
+
+    assert str(received[0].event.event_id) != received[0].message_id
+
+
+def test_pull_failure_maps_to_project_error() -> None:
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(
+            pull_error=GoogleAPICallError("pull failed"),  # type: ignore[no-untyped-call]
+        ),
+    )
+
+    with pytest.raises(MessagePullError):
+        consumer.pull(max_messages=1)
+
+
+def test_public_pull_api_does_not_return_raw_google_messages() -> None:
+    received = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=FakeSubscriberClient(received_messages=[make_received_message()]),
+    ).pull(max_messages=1)
+
+    assert all(not isinstance(item, FakeReceivedMessage) for item in received)
+
+
+def test_pull_does_not_automatically_acknowledge() -> None:
+    client = FakeSubscriberClient(received_messages=[make_received_message()])
+
+    PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    ).pull(max_messages=1)
+
+    assert client.acknowledge_requests == []
+
+
+def test_explicit_acknowledge_uses_correct_ack_id() -> None:
+    client = FakeSubscriberClient(received_messages=[make_received_message(ack_id="ack-123")])
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+    received = consumer.pull(max_messages=1)
+
+    consumer.acknowledge(received)
+
+    assert client.acknowledge_requests[0]["ack_ids"] == ["ack-123"]
+
+
+def test_acknowledging_multiple_messages_uses_unique_ack_ids() -> None:
+    client = FakeSubscriberClient(
+        received_messages=[
+            make_received_message(message_id="msg-1", ack_id="ack-1"),
+            make_received_message(message_id="msg-2", ack_id="ack-2"),
+            make_received_message(message_id="msg-3", ack_id="ack-2"),
+        ]
+    )
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+
+    consumer.acknowledge(consumer.pull(max_messages=3))
+
+    assert client.acknowledge_requests[0]["ack_ids"] == ["ack-1", "ack-2"]
+
+
+def test_acknowledgement_failure_maps_to_project_error() -> None:
+    client = FakeSubscriberClient(
+        received_messages=[make_received_message()],
+        acknowledge_error=GoogleAPICallError("ack failed"),  # type: ignore[no-untyped-call]
+    )
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+
+    with pytest.raises(MessageAcknowledgeError):
+        consumer.acknowledge(consumer.pull(max_messages=1))
+
+
+def test_acknowledgement_does_not_alter_canonical_event() -> None:
+    client = FakeSubscriberClient(received_messages=[make_received_message()])
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+    received = consumer.pull(max_messages=1)
+    before = received[0].event
+
+    consumer.acknowledge(received)
+
+    assert received[0].event == before
+
+
+def test_empty_acknowledgement_is_noop() -> None:
+    client = FakeSubscriberClient()
+
+    PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    ).acknowledge(())
+
+    assert client.acknowledge_requests == []
+
+
+def test_redelivery_request_sets_ack_deadline_to_zero() -> None:
+    client = FakeSubscriberClient(received_messages=[make_received_message(ack_id="ack-123")])
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+
+    consumer.request_redelivery(consumer.pull(max_messages=1))
+
+    assert client.nack_requests[0]["ack_deadline_seconds"] == 0
+    assert client.nack_requests[0]["ack_ids"] == ["ack-123"]
+
+
+def test_redelivery_failure_maps_to_project_error() -> None:
+    client = FakeSubscriberClient(
+        received_messages=[make_received_message()],
+        nack_error=GoogleAPICallError("nack failed"),  # type: ignore[no-untyped-call]
+    )
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+
+    with pytest.raises(MessageRedeliveryRequestError):
+        consumer.request_redelivery(consumer.pull(max_messages=1))
+
+
+def test_redelivery_request_contains_no_processing_retry_policy() -> None:
+    client = FakeSubscriberClient(received_messages=[make_received_message()])
+    consumer = PubSubCanonicalEventConsumer(
+        PubSubSubscriptionConfig(project_id=LOCAL_PUBSUB_PROJECT_ID),
+        client=client,
+    )
+
+    consumer.request_redelivery(consumer.pull(max_messages=1))
+
+    assert "retry_policy" not in client.nack_requests[0]

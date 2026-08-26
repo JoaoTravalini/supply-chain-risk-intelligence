@@ -43,6 +43,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 9 is in progress. Stage 9A has local Pub/Sub emulator safety configuration, deterministic Canonical Event serialization, derived message attributes, an emulator-only canonical topic bootstrap, and a Canonical Event publisher for `canonical-events-v1`. Emulator smoke validation requires `PUBSUB_EMULATOR_HOST` and `PUBSUB_PROJECT_ID` in the active shell.
+Stage 9: Pub/Sub Messaging Pipeline is complete. Stage 9A added local Pub/Sub emulator safety configuration, deterministic Canonical Event serialization, derived message attributes, an emulator-only canonical topic bootstrap, and a Canonical Event publisher for `canonical-events-v1`. Stage 9B added the `canonical-events-processing-v1` pull subscription, Canonical Event deserialization, attribute integrity validation, synchronous pull consumer, explicit acknowledgement, and a redelivery transport primitive.
 
-Provider data is not persisted. Pub/Sub subscriptions, pull consumers, message acknowledgement behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.
+Provider data is not persisted. Processing idempotency, duplicate suppression, retry policy, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.

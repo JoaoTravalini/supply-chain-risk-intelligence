@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import json
 
+from pydantic import ValidationError
+
 from supplychain.contracts import CanonicalEvent
+from supplychain.messaging.errors import (
+    MessageAttributeMismatchError,
+    MessageDeserializationError,
+)
 
 MESSAGE_CONTENT_TYPE = "application/json"
 
@@ -35,3 +41,33 @@ def canonical_event_attributes(event: CanonicalEvent) -> dict[str, str]:
         "schema_version": event.schema_version,
         "source_provider": event.source.provider,
     }
+
+
+def deserialize_canonical_event(data: bytes) -> CanonicalEvent:
+    """Deserialize UTF-8 JSON bytes into a validated Canonical Event."""
+
+    try:
+        text = data.decode("utf-8")
+        json.loads(text)
+        return CanonicalEvent.model_validate_json(text)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValidationError) as exc:
+        raise MessageDeserializationError("Message data is not a valid Canonical Event") from exc
+
+
+def validate_canonical_event_attributes(
+    *,
+    event: CanonicalEvent,
+    attributes: dict[str, str],
+    message_id: str | None = None,
+) -> None:
+    """Validate standard Pub/Sub attributes against the authoritative event body."""
+
+    expected = canonical_event_attributes(event)
+    for key, expected_value in expected.items():
+        actual_value = attributes.get(key)
+        if actual_value != expected_value:
+            raise MessageAttributeMismatchError(
+                "Pub/Sub message attribute does not match Canonical Event body",
+                attribute=key,
+                message_id=message_id,
+            )

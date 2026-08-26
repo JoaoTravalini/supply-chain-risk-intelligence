@@ -38,6 +38,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 7A: Supplier Domain Contract is complete. The Supplier v1 master-data contract, JSON Schema artifact, and contract tests are implemented. The RAW, CORE, and MART BigQuery Sandbox datasets remain provisioned and managed by OpenTofu with billing disabled, and no physical BigQuery tables exist yet.
+Stage 7: Supplier Domain + Synthetic Dataset is complete. The Supplier v1 master-data contract, JSON Schema artifact, deterministic synthetic Supplier JSONL dataset, manifest, checksum, and validation tests are implemented. The RAW, CORE, and MART BigQuery Sandbox datasets remain provisioned and managed by OpenTofu with billing disabled, and no physical BigQuery tables exist yet.
 
-Stage 7 remains in progress. The next stage is Stage 7B: Deterministic Synthetic Supplier Dataset. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.
+The next stage is Stage 8: External Data Adapters. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.

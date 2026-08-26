@@ -2,7 +2,7 @@
 
 The Supplier contract defines canonical supplier master data for SupplyChain Sentinel. It represents relatively stable business attributes used by future synthetic data, analytical modeling, risk calculation, and event correlation.
 
-Stage 7A defines only the domain contract, validation behavior, JSON Schema artifact, and tests. It does not generate supplier records, create dataset files, create BigQuery tables, or implement operational observations.
+Stage 7 defines the domain contract, validation behavior, JSON Schema artifact, tests, and deterministic synthetic master dataset. It does not create BigQuery tables or implement operational observations.
 
 ## Schema Version
 
@@ -25,7 +25,7 @@ Rules:
 - Case-sensitive.
 - No whitespace-only or malformed values.
 
-Supplier ID generation is deferred to Stage 7B.
+Supplier IDs are deterministic and sequential in the Stage 7B synthetic dataset.
 
 ## Fields
 
@@ -113,9 +113,9 @@ The generic Canonical Event envelope remains independent of the Supplier domain 
 
 Supplier models are immutable after validation. Future updates should conceptually produce a new validated representation rather than mutating an existing model. Persistence and history are deferred.
 
-## Synthetic Data Policy For Stage 7B
+## Synthetic Data Policy
 
-The future supplier dataset must be:
+The Stage 7B supplier dataset is documented in [Synthetic Supplier Dataset](../data/synthetic-suppliers.md). It is:
 
 - fully synthetic;
 - deterministic and reproducible;
@@ -126,7 +126,7 @@ The future supplier dataset must be:
 - validated through the Supplier contract;
 - accompanied by integrity metadata and a checksum.
 
-Stage 7A does not implement the generator or dataset artifact.
+It has not been loaded into BigQuery, and no physical Supplier table exists yet.
 
 ## Example
 

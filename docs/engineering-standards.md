@@ -47,6 +47,7 @@ These standards define future project conventions. They are part of the Stage 0 
 - Master data and operational observations must remain separate.
 - Synthetic portfolio fixtures must be deterministic, reproducible, and generated without external network collection.
 - Generated domain data must pass the relevant domain contract validation before use.
+- Committed generated datasets must include integrity metadata and checksum validation.
 
 ## Data Access
 

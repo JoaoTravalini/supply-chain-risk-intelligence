@@ -48,7 +48,7 @@ The Canonical Event v1 contract now exists as the platform boundary for future s
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
-The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. The synthetic Supplier dataset is not generated yet, no physical CORE supplier table exists yet, and warehouse representation remains deferred. Stage 7B will create validated synthetic source data before physical table schemas are introduced.
+The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. Canonical Supplier master data now exists as a versioned synthetic JSONL artifact validated through the Supplier v1 contract. It has not been loaded into BigQuery, no physical CORE supplier table exists yet, and warehouse representation remains deferred.
 
 The analytical progression is intentionally one-way. Later stages may define controlled rebuild or replay workflows, but those workflows should preserve the same layer responsibilities.
 

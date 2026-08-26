@@ -1,0 +1,9 @@
+{
+  "dataset_name": "synthetic-suppliers-v1",
+  "generator_seed": 7407,
+  "generator_version": "1.0.0",
+  "record_count": 120,
+  "schema_path": "schemas/domain/supplier-v1.schema.json",
+  "sha256": "d7672fbe43caa16a76af4eb5988b867b755c583efa28eac89229ff397656ba66",
+  "supplier_schema_version": "1.0.0"
+}

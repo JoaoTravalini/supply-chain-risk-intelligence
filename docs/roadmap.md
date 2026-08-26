@@ -22,6 +22,8 @@ Stages may be subdivided if their scope becomes too large.
    - 8B. Open-Meteo Weather Adapter
    - 8C. USGS Seismic Adapter
 9. Pub/Sub Messaging Pipeline
+   - 9A. Local Pub/Sub Foundation & Canonical Event Publisher
+   - 9B. Subscription / Pull Consumer Transport & Local End-to-End Messaging
 10. Event Processing + Idempotency + DLQ
 11. RAW -> CORE -> MART Transformations
 12. Deterministic Risk Engine
@@ -41,6 +43,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 8: External Data Adapters is complete. The reusable HTTP boundary, provider-independent WeatherObservationPayload and SeismicEventPayload contracts, Open-Meteo current-weather adapter, USGS nearby-earthquake adapter, JSON Schema artifacts, Canonical Event mappings, documentation, and offline tests are implemented.
+Stage 9 is in progress. Stage 9A has local Pub/Sub emulator safety configuration, deterministic Canonical Event serialization, derived message attributes, an emulator-only canonical topic bootstrap, and a Canonical Event publisher for `canonical-events-v1`. Emulator smoke validation requires `PUBSUB_EMULATOR_HOST` and `PUBSUB_PROJECT_ID` in the active shell.
 
-Provider data is not persisted. Pub/Sub messaging, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.
+Provider data is not persisted. Pub/Sub subscriptions, pull consumers, message acknowledgement behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE processing, and risk scoring remain deferred.

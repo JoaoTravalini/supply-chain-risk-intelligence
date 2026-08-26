@@ -45,6 +45,12 @@ These standards define future project conventions. They are part of the Stage 0 
 - When a provider exposes both stable event identity and revision/update time, adapters must preserve both concepts separately and must not fold revision time into logical deduplication identity.
 - Entity enrichment must not redefine source-event identity.
 - Producer and source metadata must never contain credentials or secrets.
+- Pub/Sub message data is authoritative over message attributes.
+- Pub/Sub transport message IDs must not be treated as business identities.
+- Messaging consumers must assume possible redelivery.
+- Real cloud messaging resources must be managed through IaC rather than application startup.
+- Local messaging emulator bootstrap must fail closed when emulator configuration is missing or unsafe.
+- Message attributes must be derived from validated events and must not duplicate arbitrary payload or unsafe metadata.
 
 ## Domain Contracts
 

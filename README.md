@@ -4,9 +4,9 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project has completed **Stage 8C: USGS Seismic Adapter**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, Stage 4 established the OpenTofu foundation, Stage 5 established the BigQuery data architecture, Stage 6 introduced the Canonical Event v1 contract, Stage 7 introduced the Supplier v1 domain contract plus deterministic synthetic Supplier data, Stage 8A introduced the reusable external HTTP boundary, and Stage 8B introduced the Open-Meteo weather adapter.
+The project is in **Stage 9A: Local Pub/Sub Foundation & Canonical Event Publisher**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, Stage 4 established the OpenTofu foundation, Stage 5 established the BigQuery data architecture, Stage 6 introduced the Canonical Event v1 contract, Stage 7 introduced the Supplier v1 domain contract plus deterministic synthetic Supplier data, Stage 8A introduced the reusable external HTTP boundary, Stage 8B introduced the Open-Meteo weather adapter, and Stage 8C introduced the USGS seismic adapter.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, a deterministic synthetic Supplier dataset, a reusable synchronous HTTP boundary, an Open-Meteo adapter that can canonicalize one current-weather observation into a Canonical Event, and a USGS adapter that can canonicalize bounded nearby earthquake query results into Canonical Events. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Provider events are not persisted, Pub/Sub messaging is not implemented, and warehouse loading remains deferred.
+The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, provisioned BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, a deterministic synthetic Supplier dataset, a reusable synchronous HTTP boundary, Open-Meteo and USGS adapters that canonicalize provider observations into Canonical Events, and a local-emulator-only Pub/Sub publisher for `canonical-events-v1`. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and physical BigQuery tables have not yet been defined. Pub/Sub subscriptions, consumers, provider event persistence, and warehouse loading remain deferred. Local emulator smoke validation requires `PUBSUB_EMULATOR_HOST` and `PUBSUB_PROJECT_ID` in the active shell.
 
 ## Project Goals
 
@@ -48,9 +48,11 @@ Canonical local quality checks are:
 - [External HTTP Boundary](docs/integrations/http-boundary.md)
 - [Open-Meteo Weather Adapter](docs/integrations/open-meteo.md)
 - [USGS Seismic Adapter](docs/integrations/usgs.md)
+- [Pub/Sub Messaging](docs/messaging/pubsub.md)
 - [Supplier Domain Contract](docs/domain/supplier.md)
 - [Synthetic Supplier Dataset](docs/data/synthetic-suppliers.md)
 - [Roadmap](docs/roadmap.md)
 - [Architectural Decisions](docs/decisions)
 - [GCP Project Bootstrap Runbook](docs/runbooks/gcp-project-bootstrap.md)
+- [Pub/Sub Emulator Runbook](docs/runbooks/pubsub-emulator.md)
 - [Infrastructure](infra/README.md)

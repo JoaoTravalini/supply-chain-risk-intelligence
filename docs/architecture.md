@@ -64,8 +64,10 @@ source adapters use. Stage 8B adds the Open-Meteo current-weather adapter, which
 can validate one provider response and canonicalize it into
 `weather.observation.recorded`. Stage 8C adds the USGS seismic adapter, which
 can validate bounded nearby earthquake query results and canonicalize them into
-`seismic.event.detected`. Provider data is not persisted yet. Pub/Sub
-publishing and warehouse loading are not implemented yet.
+`seismic.event.detected`. Stage 9A adds a local-emulator-only Pub/Sub publisher
+that can publish validated Canonical Events to `canonical-events-v1`. Provider
+data is not persisted yet. Pub/Sub subscriptions, event processing, and
+warehouse loading are not implemented yet.
 
 Target flow:
 
@@ -75,7 +77,8 @@ External Provider
 -> External HTTP boundary
 -> Cloud Run ingestion workload
 -> Canonical event validation and normalization
--> Google Cloud Pub/Sub
+-> Pub/Sub Publisher
+-> canonical-events-v1
 -> Event processor
 -> BigQuery RAW
 -> BigQuery CORE
@@ -86,6 +89,9 @@ External Provider
 ```
 
 A dead-letter path must exist for unprocessable messaging events.
+
+Subscriber and processing workloads are not implemented yet. Pub/Sub-to-BigQuery
+ingestion is not operational in Stage 9A.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 

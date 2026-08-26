@@ -38,6 +38,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 5: BigQuery Data Architecture is complete. The RAW, CORE, and MART BigQuery Sandbox datasets are provisioned and managed by OpenTofu with billing disabled. Sandbox 60-day table and partition expiration is represented explicitly in development IaC, and no physical BigQuery tables exist yet.
+Stage 6: Canonical Event Contract is complete. The Canonical Event v1 envelope, JSON Schema artifact, and contract tests are implemented. The RAW, CORE, and MART BigQuery Sandbox datasets remain provisioned and managed by OpenTofu with billing disabled, and no physical BigQuery tables exist yet.
 
-The next stage is Stage 6: Canonical Event Contract. Stage 6 will define canonical event contracts before physical table schemas.
+The next stage is Stage 7: Supplier Domain + Synthetic Dataset. Pub/Sub messaging, physical BigQuery tables, transformations, and risk scoring remain deferred.

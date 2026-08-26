@@ -30,9 +30,16 @@ These standards define future project conventions. They are part of the Stage 0 
 - Process events idempotently.
 - Assume at-least-once message delivery.
 - Version event schemas.
+- Breaking contract changes require an explicit version strategy.
 - Preserve provenance and source metadata.
 - Prefer append-only RAW storage semantics unless a later ADR decides otherwise.
 - Validate and normalize external data before publishing canonical events.
+- Canonical event timestamps must be timezone-aware and normalized to UTC.
+- Event instance identity and logical idempotency identity must remain separate.
+- Canonical Events must always include stable source identity; source adapters own provider-specific natural-key derivation when native source IDs are absent.
+- Logical idempotency identity must use only stable source identity fields, event type, and event time.
+- Entity enrichment must not redefine source-event identity.
+- Producer and source metadata must never contain credentials or secrets.
 
 ## Data Access
 

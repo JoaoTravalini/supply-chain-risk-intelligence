@@ -27,7 +27,11 @@ MART should not be used as a raw ingestion landing area, and normal application 
 ```text
 External Sources
       ↓
-Canonical Ingestion
+Adapter
+      ↓
+Canonical Event v1
+      ↓
+Messaging
       ↓
 RAW
       ↓
@@ -39,6 +43,10 @@ Business Transformations
       ↓
 MART
 ```
+
+The Canonical Event v1 contract now exists as the platform boundary for future source normalization. Pub/Sub messaging, physical RAW tables, and ingestion processors are not implemented yet.
+
+Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
 The analytical progression is intentionally one-way. Later stages may define controlled rebuild or replay workflows, but those workflows should preserve the same layer responsibilities.
 
@@ -58,6 +66,8 @@ These are architectural concepts in Stage 5A. Physical columns and models are de
 ## Deduplication Boundary
 
 RAW preserves source records and favors append-oriented semantics. CORE is the first analytical layer expected to contain deduplicated canonical records.
+
+Logical idempotency is based only on stable source identity fields, event type, and event time. Later enrichment, including supplier/entity correlation, must not redefine which source event a canonical record represents.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
 

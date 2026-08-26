@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "EntityReference": {
+      "additionalProperties": false,
+      "description": "Reference to a platform entity associated with an event.",
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "id"
+      ],
+      "title": "EntityReference",
+      "type": "object"
+    },
+    "EventMetadata": {
+      "additionalProperties": false,
+      "description": "Metadata produced while canonicalizing an event.",
+      "properties": {
+        "correlation_id": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "deduplication_key": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$",
+          "title": "Deduplication Key",
+          "type": "string"
+        },
+        "producer": {
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$",
+          "title": "Producer",
+          "type": "string"
+        },
+        "producer_version": {
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:[-+][0-9A-Za-z.-]+)?$",
+          "title": "Producer Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "correlation_id",
+        "producer",
+        "producer_version",
+        "deduplication_key"
+      ],
+      "title": "EventMetadata",
+      "type": "object"
+    },
+    "EventType": {
+      "description": "Approved canonical event types for schema version 1.0.0.",
+      "enum": [
+        "weather.observation.recorded",
+        "seismic.event.detected",
+        "supplier.operational.snapshot.recorded"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "LocationMetadata": {
+      "additionalProperties": false,
+      "description": "Minimal location metadata for event context.",
+      "properties": {
+        "country_code": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country Code"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        }
+      },
+      "title": "LocationMetadata",
+      "type": "object"
+    },
+    "SourceMetadata": {
+      "additionalProperties": false,
+      "description": "Source provenance metadata without credentials or secrets.",
+      "properties": {
+        "endpoint": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Endpoint"
+        },
+        "provider": {
+          "minLength": 1,
+          "title": "Provider",
+          "type": "string"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/@-]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Request Id"
+        },
+        "source_event_id": {
+          "minLength": 1,
+          "title": "Source Event Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "source_event_id"
+      ],
+      "title": "SourceMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Immutable canonical event envelope for event-driven ingestion.",
+  "properties": {
+    "entity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EntityReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "event_id": {
+      "format": "uuid",
+      "title": "Event Id",
+      "type": "string"
+    },
+    "event_time": {
+      "format": "date-time",
+      "title": "Event Time",
+      "type": "string"
+    },
+    "event_type": {
+      "$ref": "#/$defs/EventType"
+    },
+    "ingested_at": {
+      "format": "date-time",
+      "title": "Ingested At",
+      "type": "string"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LocationMetadata"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "metadata": {
+      "$ref": "#/$defs/EventMetadata"
+    },
+    "payload": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Payload",
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/SourceMetadata"
+    }
+  },
+  "required": [
+    "event_type",
+    "event_time",
+    "source",
+    "payload",
+    "metadata"
+  ],
+  "title": "CanonicalEvent",
+  "type": "object"
+}

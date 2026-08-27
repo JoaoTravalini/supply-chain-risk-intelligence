@@ -29,6 +29,8 @@ Stages may be subdivided if their scope becomes too large.
    - 10B. Persistent Idempotency Ledger & Revision-Aware Decisions
    - 10C. Pub/Sub Processing Coordinator, Failure Policy & DLQ
      - 10C.1. Processing Coordinator & Safe ACK Ordering
+     - 10C.2A. Processing Failure Classification Contract
+     - 10C.2B. Retry Budget, Redelivery, Poison Handling & DLQ
 11. RAW -> CORE -> MART Transformations
 12. Deterministic Risk Engine
 
@@ -47,6 +49,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 10 is in progress. Stage 10A is complete and adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`. Stage 10B is complete and adds the local persistent processing ledger, schema version 1, revision-marker extraction for USGS seismic events, and ledger-aware `NEW`, `DUPLICATE`, `NEWER_REVISION`, `STALE_REVISION`, and `REVISION_CONFLICT` resolution. Stage 10C.1 is complete and adds a one-message processing coordinator for valid Canonical Events with safe handler, ledger `record_success`, and ACK ordering.
+Stage 10 is in progress. Stage 10A is complete and adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`. Stage 10B is complete and adds the local persistent processing ledger, schema version 1, revision-marker extraction for USGS seismic events, and ledger-aware `NEW`, `DUPLICATE`, `NEWER_REVISION`, `STALE_REVISION`, and `REVISION_CONFLICT` resolution. Stage 10C.1 is complete and adds a one-message processing coordinator for valid Canonical Events with safe handler, ledger `record_success`, and ACK ordering. Stage 10C.2A is complete and adds failure classification for declared handler failures, unexpected exceptions, and revision conflicts without transport disposition.
 
-Provider data is not persisted to RAW or CORE. Retry policy, automatic NACK or redelivery behavior, poison-message handling, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE persistence, and risk scoring remain deferred.
+Provider data is not persisted to RAW or CORE. Stage 10C.2B retry budget, attempt accounting, automatic NACK or redelivery behavior, poison-message handling, DLQ behavior, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE persistence, and risk scoring remain deferred.

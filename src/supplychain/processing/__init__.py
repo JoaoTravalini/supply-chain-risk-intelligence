@@ -15,6 +15,15 @@ from supplychain.processing.decisions import (
     ProcessingError,
     assess_event,
 )
+from supplychain.processing.failures import (
+    NonRetryableProcessingError,
+    ProcessingFailure,
+    ProcessingFailureKind,
+    ProcessingHandlerError,
+    RetryableProcessingError,
+    classify_processing_exception,
+    classify_revision_conflict,
+)
 from supplychain.processing.fingerprints import (
     SOURCE_CONTENT_FINGERPRINT_ALGORITHM,
     generate_source_content_fingerprint,
@@ -37,6 +46,7 @@ __all__ = [
     "CanonicalEventHandler",
     "CoordinatorOutcome",
     "MessageAcknowledger",
+    "NonRetryableProcessingError",
     "ProcessedEventRecord",
     "ProcessedLedgerRecord",
     "ProcessingAssessment",
@@ -45,12 +55,18 @@ __all__ = [
     "ProcessingCoordinatorResult",
     "ProcessingDecision",
     "ProcessingError",
+    "ProcessingFailure",
+    "ProcessingFailureKind",
+    "ProcessingHandlerError",
     "ProcessingLedger",
     "ProcessingResolution",
     "ProcessingResolutionResult",
+    "RetryableProcessingError",
     "SourceRevision",
     "SqliteProcessingLedger",
     "assess_event",
+    "classify_processing_exception",
+    "classify_revision_conflict",
     "extract_source_revision",
     "generate_source_content_fingerprint",
 ]

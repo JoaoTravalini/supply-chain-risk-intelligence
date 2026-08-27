@@ -83,6 +83,13 @@ The coordinator does not call the redelivery primitive and does not NACK
 messages. Retry counters, backoff, delivery-attempt policy, poison-message
 handling, and DLQ routing remain deferred.
 
+Stage 10C.2A adds explicit handler failure classification. If a handler raises
+`RetryableProcessingError`, `NonRetryableProcessingError`, or an unexpected
+exception, the coordinator behavior remains unchanged: the exception propagates,
+`record_success` is not called, ACK is not called, and redelivery is not
+requested automatically. Classification remains separate from transport
+disposition.
+
 ## ACK Failure And Redelivery
 
 If the handler succeeds and `record_success` persists success but the ACK fails,

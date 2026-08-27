@@ -65,6 +65,10 @@ These standards define future project conventions. They are part of the Stage 0 
 - Revision conflicts must not be ACKed until a later explicit failure policy exists.
 - Handler, ledger, and ACK failures must propagate without hidden retry or automatic redelivery policy unless a later stage defines that policy.
 - ACK failure after successful ledger mutation must not rollback ledger state or cause an in-process second handler attempt.
+- Retryability must be declared explicitly through handler failure contracts, not inferred from exception message text.
+- Unknown software exceptions must remain distinguishable from declared retryable or non-retryable handler failures.
+- Failure classification must not imply transport action such as ACK, NACK, retry, or dead-letter routing.
+- Revision conflict must not be silently treated as a transient retryable failure.
 - Stale provider revisions must not overwrite newer successfully accepted revision state.
 - Do not use last-arrival-wins behavior when provider revision ordering cannot be proven.
 - Revision conflicts must remain explicit when authoritative ordering cannot be established safely.

@@ -75,9 +75,11 @@ that stores successful idempotency/revision state and resolves candidates into
 `NEWER_REVISION`, `STALE_REVISION`, or `REVISION_CONFLICT` when safe. Stage
 10C.1 adds a one-message processing coordinator that safely orders ledger
 assessment, handler execution, successful ledger mutation, and Pub/Sub ACK for
-already-valid Canonical Events. Provider data is not persisted yet. Retry
-policy, DLQ behavior, warehouse sinks, and BigQuery loading are not implemented
-yet.
+already-valid Canonical Events. Stage 10C.2A adds processing failure
+classification for declared handler failures, unexpected exceptions, and
+revision conflicts, without mapping those classifications to transport action.
+Provider data is not persisted yet. Retry policy, NACK/redelivery behavior, DLQ
+behavior, warehouse sinks, and BigQuery loading are not implemented yet.
 
 Target flow:
 
@@ -98,6 +100,7 @@ External Provider
    -> Persistent Processing Ledger
       -> NEW | DUPLICATE | NEWER_REVISION | STALE_REVISION | REVISION_CONFLICT
    -> Event handler
+   -> Failure classification
    -> ACK decision
 -> Event processor
 -> BigQuery RAW
@@ -111,8 +114,9 @@ External Provider
 A dead-letter path must exist for unprocessable messaging events.
 
 The Stage 10B ledger is local. Stage 10C.1 adds one-message coordination for
-valid deliveries, but does not run a worker loop or define retry policy.
-Dead-letter handling and Pub/Sub-to-BigQuery ingestion are not operational yet.
+valid deliveries. Stage 10C.2A classifies failure kinds, but does not run a
+worker loop, define retry budget, request redelivery, or dead-letter messages.
+Pub/Sub-to-BigQuery ingestion is not operational yet.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 

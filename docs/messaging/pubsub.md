@@ -109,6 +109,11 @@ ACK. `REVISION_CONFLICT` skips handler execution and does not ACK. The
 coordinator does not request redelivery, implement retry counters, run backoff,
 or route to a DLQ.
 
+Stage 10C.2A classifies valid-event processing failures separately from
+transport disposition. A retryable, non-retryable, unexpected, or
+revision-conflict classification does not automatically invoke the redelivery
+primitive, ACK the message, or publish to a DLQ.
+
 ## Local Emulator Bootstrap
 
 Local development may bootstrap emulator resources programmatically. The Stage 9 bootstrap operation is explicitly local-emulator-only and ensures `canonical-events-v1` and `canonical-events-processing-v1` exist in the emulator idempotently.

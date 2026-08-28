@@ -78,8 +78,12 @@ assessment, handler execution, successful ledger mutation, and Pub/Sub ACK for
 already-valid Canonical Events. Stage 10C.2A adds processing failure
 classification for declared handler failures, unexpected exceptions, and
 revision conflicts, without mapping those classifications to transport action.
-Provider data is not persisted yet. Retry policy, NACK/redelivery behavior, DLQ
-behavior, warehouse sinks, and BigQuery loading are not implemented yet.
+Stage 10C.2B adds bounded disposition policy and local native Pub/Sub
+dead-letter topology for valid-event processing failures. Stage 10C.2B.1 adds a
+local dead-letter inspection subscription and clarifies that managed Pub/Sub
+dead-letter forwarding is best effort, not an exact delivery-attempt guarantee.
+Provider data is not persisted yet. Worker runtime, DLQ consumption/replay,
+warehouse sinks, and BigQuery loading are not implemented yet.
 
 Target flow:
 
@@ -101,7 +105,8 @@ External Provider
       -> NEW | DUPLICATE | NEWER_REVISION | STALE_REVISION | REVISION_CONFLICT
    -> Event handler
    -> Failure classification
-   -> ACK decision
+   -> ACK / bounded disposition decision
+   -> Redelivery / native DLQ path when needed
 -> Event processor
 -> BigQuery RAW
 -> BigQuery CORE
@@ -114,9 +119,14 @@ External Provider
 A dead-letter path must exist for unprocessable messaging events.
 
 The Stage 10B ledger is local. Stage 10C.1 adds one-message coordination for
-valid deliveries. Stage 10C.2A classifies failure kinds, but does not run a
-worker loop, define retry budget, request redelivery, or dead-letter messages.
-Pub/Sub-to-BigQuery ingestion is not operational yet.
+valid deliveries. Stage 10C.2A classifies failure kinds. Stage 10C.2B maps those
+kinds to bounded disposition for one delivery and uses native Pub/Sub
+dead-letter policy in local topology. Stage 10C.2B.1 adds the local
+`canonical-events-dead-letter-inspection-v1` subscription attached to
+`canonical-events-dead-letter-v1`. It does not run a worker loop, persist retry
+state, consume or replay DLQ messages, manually republish DLQ messages, or write
+Pub/Sub events to BigQuery. Pub/Sub-to-BigQuery ingestion is not operational
+yet.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 

@@ -69,6 +69,14 @@ These standards define future project conventions. They are part of the Stage 0 
 - Unknown software exceptions must remain distinguishable from declared retryable or non-retryable handler failures.
 - Failure classification must not imply transport action such as ACK, NACK, retry, or dead-letter routing.
 - Revision conflict must not be silently treated as a transient retryable failure.
+- Application retry policy must not use unbounded in-process loops or custom sleep/backoff.
+- Delivery attempts are transport/runtime metadata and must not redefine application identity.
+- Pub/Sub delivery-attempt metadata must not be treated as an exact globally reliable application retry counter.
+- Transport failures after processing success are not business-processing failures.
+- Dead-letter paths must preserve the original Canonical Event DATA as authoritative unless a later explicit envelope contract is approved.
+- Semantic dead-letter intent must remain separate from managed Pub/Sub best-effort forwarding behavior; do not claim immediate or exact-attempt DLQ movement.
+- Real Pub/Sub topology, including dead-letter topics and policies, must be managed through IaC outside local emulator bootstrap.
+- Future production Pub/Sub dead-letter IaC must include the managed Pub/Sub service-agent IAM required for native forwarding.
 - Stale provider revisions must not overwrite newer successfully accepted revision state.
 - Do not use last-arrival-wins behavior when provider revision ordering cannot be proven.
 - Revision conflicts must remain explicit when authoritative ordering cannot be established safely.

@@ -16,8 +16,9 @@ It does not answer:
 What transport action should Pub/Sub take for this delivery?
 ```
 
-Retry budgets, automatic redelivery, NACK behavior, poison-message policy, and
-DLQ routing remain deferred to Stage 10C.2B.
+Retry budgets, redelivery requests, poison-message policy, and DLQ intent are
+handled by the later Stage 10C.2B runtime/disposition layer, not by
+classification itself.
 
 ## Handler Failure Contract
 
@@ -76,7 +77,23 @@ arbitrary exception args, or exception message text.
 `ProcessingFailureKind.REVISION_CONFLICT` does not itself mean DLQ.
 `ProcessingFailureKind.UNEXPECTED` does not automatically mean retry.
 
-Stage 10C.2B will map failure classification plus bounded attempt state to
-transport and dead-letter disposition. Stage 10C.2A implements no retry loop, no
-attempt accounting, no automatic NACK/redelivery, no DLQ publisher, no
-ack-deadline extension, and no worker runtime.
+Stage 10C.2B maps failure classification plus bounded delivery-attempt state to
+`ACK`, `REDELIVER`, or `DEAD_LETTER` disposition. The mapping remains separate
+from classification:
+
+- `RETRYABLE`: redeliver while below the configured attempt budget; dead-letter
+  after exhaustion.
+- `UNEXPECTED`: redeliver while below the configured attempt budget; dead-letter
+  after exhaustion.
+- `NON_RETRYABLE`: semantic dead-letter intent, without claiming native Pub/Sub
+  forwarding occurs on the first delivery.
+- `REVISION_CONFLICT`: semantic dead-letter intent, with actual forwarding still
+  controlled by native Pub/Sub best-effort delivery-attempt behavior.
+
+Unknown delivery attempt is not treated as exhausted. For `RETRYABLE` and
+`UNEXPECTED`, unknown attempt maps to `REDELIVER`; `NON_RETRYABLE` and
+`REVISION_CONFLICT` still map to `DEAD_LETTER`.
+
+Stage 10C.2B still implements no Python retry loop, no custom retry counter, no
+DLQ publisher, no ack-deadline extension, no DLQ consumer/replay, and no worker
+runtime.

@@ -10,7 +10,9 @@ from dataclasses import dataclass
 from supplychain.messaging.errors import LocalPubSubEmulatorConfigurationError
 
 CANONICAL_EVENTS_TOPIC_ID = "canonical-events-v1"
+CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID = "canonical-events-dead-letter-v1"
 CANONICAL_EVENTS_SUBSCRIPTION_ID = "canonical-events-processing-v1"
+CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID = "canonical-events-dead-letter-inspection-v1"
 LOCAL_PUBSUB_PROJECT_ID = "supplychain-local"
 PUBSUB_EMULATOR_HOST_ENV = "PUBSUB_EMULATOR_HOST"
 PUBSUB_PROJECT_ID_ENV = "PUBSUB_PROJECT_ID"
@@ -18,6 +20,7 @@ DEFAULT_PUBLISH_ACK_TIMEOUT_SECONDS = 10.0
 DEFAULT_ACK_DEADLINE_SECONDS = 30
 DEFAULT_PULL_TIMEOUT_SECONDS = 5.0
 MAX_PULL_MESSAGES = 100
+PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS = 5
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,10 +79,13 @@ class LocalPubSubEmulatorConfig:
     emulator_host: str
     project_id: str
     topic_id: str = CANONICAL_EVENTS_TOPIC_ID
+    dead_letter_topic_id: str = CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID
     subscription_id: str = CANONICAL_EVENTS_SUBSCRIPTION_ID
+    dead_letter_subscription_id: str = CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID
     publish_ack_timeout_seconds: float = DEFAULT_PUBLISH_ACK_TIMEOUT_SECONDS
     pull_timeout_seconds: float = DEFAULT_PULL_TIMEOUT_SECONDS
     ack_deadline_seconds: int = DEFAULT_ACK_DEADLINE_SECONDS
+    dead_letter_max_delivery_attempts: int = PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS
 
     @classmethod
     def from_environment(
@@ -116,11 +122,31 @@ class LocalPubSubEmulatorConfig:
             subscription_id=self.subscription_id,
             pull_timeout_seconds=self.pull_timeout_seconds,
         )
+        if not self.dead_letter_topic_id.strip():
+            raise LocalPubSubEmulatorConfigurationError(
+                "Pub/Sub dead-letter topic ID must not be blank",
+                project_id=self.project_id,
+                topic_id=self.topic_id,
+            )
+        PubSubSubscriptionConfig(
+            project_id=self.project_id,
+            subscription_id=self.dead_letter_subscription_id,
+            pull_timeout_seconds=self.pull_timeout_seconds,
+        )
         if self.ack_deadline_seconds < 10 or self.ack_deadline_seconds > 600:
             raise LocalPubSubEmulatorConfigurationError(
                 "Pub/Sub acknowledgement deadline must be between 10 and 600 seconds",
                 project_id=self.project_id,
                 topic_id=self.topic_id,
+            )
+        if (
+            self.dead_letter_max_delivery_attempts < 5
+            or self.dead_letter_max_delivery_attempts > 100
+        ):
+            raise LocalPubSubEmulatorConfigurationError(
+                "Pub/Sub dead-letter max delivery attempts must be between 5 and 100",
+                project_id=self.project_id,
+                topic_id=self.dead_letter_topic_id,
             )
 
     def topic_config(self) -> PubSubTopicConfig:

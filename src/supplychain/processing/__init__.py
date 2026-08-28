@@ -15,6 +15,13 @@ from supplychain.processing.decisions import (
     ProcessingError,
     assess_event,
 )
+from supplychain.processing.disposition import (
+    ProcessingDisposition,
+    ProcessingRuntimeCoordinator,
+    ProcessingRuntimeResult,
+    RedeliveryRequester,
+    determine_failure_disposition,
+)
 from supplychain.processing.failures import (
     NonRetryableProcessingError,
     ProcessingFailure,
@@ -54,6 +61,7 @@ __all__ = [
     "ProcessingCoordinator",
     "ProcessingCoordinatorResult",
     "ProcessingDecision",
+    "ProcessingDisposition",
     "ProcessingError",
     "ProcessingFailure",
     "ProcessingFailureKind",
@@ -61,12 +69,16 @@ __all__ = [
     "ProcessingLedger",
     "ProcessingResolution",
     "ProcessingResolutionResult",
+    "ProcessingRuntimeCoordinator",
+    "ProcessingRuntimeResult",
+    "RedeliveryRequester",
     "RetryableProcessingError",
     "SourceRevision",
     "SqliteProcessingLedger",
     "assess_event",
     "classify_processing_exception",
     "classify_revision_conflict",
+    "determine_failure_disposition",
     "extract_source_revision",
     "generate_source_content_fingerprint",
 ]

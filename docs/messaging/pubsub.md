@@ -1,6 +1,6 @@
 # Pub/Sub Messaging
 
-SupplyChain Sentinel uses Google Cloud Pub/Sub as the event-driven messaging backbone for validated Canonical Events. Stage 9 implements the local-emulator foundation, one publisher path for `CanonicalEvent -> Pub/Sub`, one pull subscription, and a synchronous pull consumer. Stage 10 adds local processing idempotency, revision-aware ledger resolution, and a one-message coordinator that ACKs only after safe ledger/handler ordering. It does not implement warehouse ingestion, retries, dead-letter handling, or long-running worker runtime.
+SupplyChain Sentinel uses Google Cloud Pub/Sub as the event-driven messaging backbone for validated Canonical Events. Stage 9 implements the local-emulator foundation, one publisher path for `CanonicalEvent -> Pub/Sub`, one pull subscription, and a synchronous pull consumer. Stage 10 adds local processing idempotency, revision-aware ledger resolution, a one-message coordinator that ACKs only after safe ledger/handler ordering, failure classification, bounded disposition policy, and local native dead-letter topology. It does not implement warehouse ingestion, production Pub/Sub IaC, DLQ consumption, replay, or long-running worker runtime.
 
 ## Topic Topology
 
@@ -110,14 +110,43 @@ coordinator does not request redelivery, implement retry counters, run backoff,
 or route to a DLQ.
 
 Stage 10C.2A classifies valid-event processing failures separately from
-transport disposition. A retryable, non-retryable, unexpected, or
-revision-conflict classification does not automatically invoke the redelivery
-primitive, ACK the message, or publish to a DLQ.
+transport disposition. Stage 10C.2B maps those classifications to bounded
+runtime disposition for one delivery.
+
+The approved Stage 10C.2B dead-letter topic is:
+
+```text
+canonical-events-dead-letter-v1
+```
+
+The approved Stage 10C.2B.1 dead-letter inspection subscription is:
+
+```text
+canonical-events-dead-letter-inspection-v1
+```
+
+The canonical processing subscription is configured locally with a native Pub/Sub
+dead-letter policy pointing to that topic and `max_delivery_attempts = 5`.
+Exactly-once delivery, ordering, push delivery, filters, and retry topics remain
+disabled/not configured.
+
+The value `5` is the service's minimum supported maximum-delivery-attempt value
+and this project's intended retry boundary. Managed Pub/Sub dead-letter
+forwarding is best effort; it is not a guarantee of exactly five deliveries.
+Forwarding can occur after fewer attempts, additional attempts may occur, and
+delivery-attempt metadata is not a strict application transaction counter.
+
+The Pub/Sub client does not provide a direct operation to send an existing pulled
+delivery to the DLQ immediately. For semantic `DEAD_LETTER` disposition, the
+runtime requests redelivery once and relies on the subscription's native
+dead-letter policy to forward according to managed Pub/Sub best-effort
+semantics. The application does not manually republish a Canonical Event to the
+DLQ.
 
 ## Local Emulator Bootstrap
 
-Local development may bootstrap emulator resources programmatically. The Stage 9 bootstrap operation is explicitly local-emulator-only and ensures `canonical-events-v1` and `canonical-events-processing-v1` exist in the emulator idempotently.
+Local development may bootstrap emulator resources programmatically. The bootstrap operation is explicitly local-emulator-only and ensures `canonical-events-v1`, `canonical-events-dead-letter-v1`, `canonical-events-processing-v1`, and `canonical-events-dead-letter-inspection-v1` exist in the emulator idempotently.
 
 The bootstrap guard requires `PUBSUB_EMULATOR_HOST` and `PUBSUB_PROJECT_ID`. The emulator host must be a loopback target such as `127.0.0.1:<port>`, `localhost:<port>`, or `[::1]:<port>`.
 
-Future real cloud Pub/Sub resources must be provisioned through OpenTofu/IaC, not implicitly created by application startup. Stage 9 adds no real Pub/Sub infrastructure.
+Future real cloud Pub/Sub resources must be provisioned through OpenTofu/IaC, not implicitly created by application startup. Stage 10C.2B adds no real Pub/Sub infrastructure.

@@ -81,7 +81,7 @@ Failures propagate to the caller without automatic recovery policy in Stage
 
 The coordinator does not call the redelivery primitive and does not NACK
 messages. Retry counters, backoff, delivery-attempt policy, poison-message
-handling, and DLQ routing remain deferred.
+handling, and DLQ routing belong to the separate runtime/disposition layer.
 
 Stage 10C.2A adds explicit handler failure classification. If a handler raises
 `RetryableProcessingError`, `NonRetryableProcessingError`, or an unexpected
@@ -89,6 +89,13 @@ exception, the coordinator behavior remains unchanged: the exception propagates,
 `record_success` is not called, ACK is not called, and redelivery is not
 requested automatically. Classification remains separate from transport
 disposition.
+
+Stage 10C.2B adds a separate runtime/disposition layer around this coordinator.
+That layer maps classified failures and delivery attempts to bounded
+disposition. It does not rewrite the coordinator's safe processing order or make
+the low-level coordinator run retry, redelivery, or DLQ logic itself.
+Native Pub/Sub DLQ forwarding remains best effort and is not an exact-attempt
+guarantee.
 
 ## ACK Failure And Redelivery
 

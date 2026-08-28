@@ -19,11 +19,14 @@ from supplychain.contracts import (
     generate_deduplication_key,
 )
 from supplychain.messaging import (
+    CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID,
+    CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID,
     CANONICAL_EVENTS_SUBSCRIPTION_ID,
     CANONICAL_EVENTS_TOPIC_ID,
     DEFAULT_ACK_DEADLINE_SECONDS,
     LOCAL_PUBSUB_PROJECT_ID,
     MESSAGE_CONTENT_TYPE,
+    PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS,
     LocalPubSubEmulatorConfig,
     LocalPubSubEmulatorConfigurationError,
     MessageAcknowledgeError,
@@ -144,8 +147,12 @@ class FakePullResponse:
 
 
 class FakeSubscription:
-    def __init__(self, *, topic: str) -> None:
+    def __init__(self, *, topic: str, dead_letter_policy: object) -> None:
         self.topic = topic
+        self.dead_letter_policy = dead_letter_policy
+
+
+_DEFAULT_DEAD_LETTER_POLICY = object()
 
 
 class FakeSubscriberClient:
@@ -158,6 +165,11 @@ class FakeSubscriberClient:
         nack_error: GoogleAPICallError | None = None,
         subscription_exists: bool = True,
         subscription_topic: str = "projects/supplychain-local/topics/canonical-events-v1",
+        dead_letter_policy: Mapping[str, object] | object | None = _DEFAULT_DEAD_LETTER_POLICY,
+        dead_letter_subscription_exists: bool = True,
+        dead_letter_subscription_topic: str = (
+            "projects/supplychain-local/topics/canonical-events-dead-letter-v1"
+        ),
     ) -> None:
         self.received_messages = [] if received_messages is None else received_messages
         self.pull_error = pull_error
@@ -165,12 +177,24 @@ class FakeSubscriberClient:
         self.nack_error = nack_error
         self.subscription_exists = subscription_exists
         self.subscription_topic = subscription_topic
+        self.dead_letter_subscription_exists = dead_letter_subscription_exists
+        self.dead_letter_subscription_topic = dead_letter_subscription_topic
+        if dead_letter_policy is _DEFAULT_DEAD_LETTER_POLICY:
+            self.dead_letter_policy: Mapping[str, object] | None = {
+                "dead_letter_topic": (
+                    "projects/supplychain-local/topics/canonical-events-dead-letter-v1"
+                ),
+                "max_delivery_attempts": PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS,
+            }
+        else:
+            self.dead_letter_policy = cast(Mapping[str, object] | None, dead_letter_policy)
         self.pull_requests: list[Mapping[str, object]] = []
         self.pull_timeouts: list[float] = []
         self.acknowledge_requests: list[Mapping[str, object]] = []
         self.nack_requests: list[Mapping[str, object]] = []
         self.get_subscription_requests: list[Mapping[str, str]] = []
         self.create_subscription_requests: list[Mapping[str, object]] = []
+        self.delete_subscription_requests: list[Mapping[str, str]] = []
         self.closed = False
 
     def subscription_path(self, project: str, subscription: str) -> str:
@@ -197,14 +221,49 @@ class FakeSubscriberClient:
 
     def get_subscription(self, request: Mapping[str, str]) -> FakeSubscription:
         self.get_subscription_requests.append(request)
+        if request["subscription"].endswith(
+            f"/subscriptions/{CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID}",
+        ):
+            if not self.dead_letter_subscription_exists:
+                raise NotFound("missing dead-letter subscription")  # type: ignore[no-untyped-call]
+            return FakeSubscription(
+                topic=self.dead_letter_subscription_topic,
+                dead_letter_policy=None,
+            )
         if not self.subscription_exists:
             raise NotFound("missing subscription")  # type: ignore[no-untyped-call]
-        return FakeSubscription(topic=self.subscription_topic)
+        return FakeSubscription(
+            topic=self.subscription_topic,
+            dead_letter_policy=self.dead_letter_policy,
+        )
 
     def create_subscription(self, request: Mapping[str, object]) -> FakeSubscription:
         self.create_subscription_requests.append(request)
+        name = cast(str, request["name"])
+        if name.endswith(f"/subscriptions/{CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID}"):
+            self.dead_letter_subscription_exists = True
+            self.dead_letter_subscription_topic = cast(str, request["topic"])
+            return FakeSubscription(
+                topic=self.dead_letter_subscription_topic,
+                dead_letter_policy=None,
+            )
         self.subscription_exists = True
-        return FakeSubscription(topic=cast(str, request["topic"]))
+        self.subscription_topic = cast(str, request["topic"])
+        self.dead_letter_policy = cast(Mapping[str, object], request.get("dead_letter_policy"))
+        return FakeSubscription(
+            topic=self.subscription_topic,
+            dead_letter_policy=self.dead_letter_policy,
+        )
+
+    def delete_subscription(self, request: Mapping[str, str]) -> object:
+        self.delete_subscription_requests.append(request)
+        if request["subscription"].endswith(
+            f"/subscriptions/{CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID}",
+        ):
+            self.dead_letter_subscription_exists = False
+            return object()
+        self.subscription_exists = False
+        return object()
 
     def close(self) -> None:
         self.closed = True
@@ -299,6 +358,16 @@ def test_non_local_emulator_bootstrap_targets_are_rejected(host: str) -> None:
 
 def test_canonical_topic_id_is_the_approved_topology_value() -> None:
     assert CANONICAL_EVENTS_TOPIC_ID == "canonical-events-v1"
+
+
+def test_canonical_dead_letter_topic_id_is_the_approved_topology_value() -> None:
+    assert CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID == "canonical-events-dead-letter-v1"
+
+
+def test_canonical_dead_letter_subscription_id_is_the_approved_topology_value() -> None:
+    assert (
+        CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID == "canonical-events-dead-letter-inspection-v1"
+    )
 
 
 def test_canonical_event_serializes_to_bytes() -> None:
@@ -662,23 +731,130 @@ def test_existing_correct_subscription_is_idempotent() -> None:
     )
 
     assert result.subscription_created is False
+    assert result.dead_letter_subscription_created is False
     assert subscriber_client.create_subscription_requests == []
 
 
-def test_existing_subscription_with_unexpected_topic_fails_safely() -> None:
-    with pytest.raises(Exception) as exc_info:
-        ensure_local_pubsub_emulator_topology(
-            config=LocalPubSubEmulatorConfig(
-                emulator_host="127.0.0.1:8085",
-                project_id=LOCAL_PUBSUB_PROJECT_ID,
-            ),
-            publisher_client=FakePublisherClient(),
-            subscriber_client=FakeSubscriberClient(
-                subscription_topic="projects/other/topics/wrong"
-            ),
-        )
+def test_existing_subscription_with_unexpected_topic_is_recreated_locally() -> None:
+    subscriber_client = FakeSubscriberClient(
+        subscription_topic="projects/other/topics/wrong",
+    )
 
-    assert "unexpected topic" in str(exc_info.value)
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.subscription_recreated is True
+    assert subscriber_client.delete_subscription_requests == [
+        {"subscription": "projects/supplychain-local/subscriptions/canonical-events-processing-v1"}
+    ]
+    assert subscriber_client.create_subscription_requests[0]["topic"] == result.topic_path
+
+
+def test_existing_subscription_without_dead_letter_policy_is_recreated_locally() -> None:
+    subscriber_client = FakeSubscriberClient(dead_letter_policy=None)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.subscription_recreated is True
+    assert subscriber_client.delete_subscription_requests != []
+
+
+def test_absent_dead_letter_inspection_subscription_is_created() -> None:
+    subscriber_client = FakeSubscriberClient(dead_letter_subscription_exists=False)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.dead_letter_subscription_created is True
+    assert result.dead_letter_subscription_recreated is False
+    assert subscriber_client.create_subscription_requests[-1] == {
+        "name": (
+            "projects/supplychain-local/subscriptions/canonical-events-dead-letter-inspection-v1"
+        ),
+        "topic": "projects/supplychain-local/topics/canonical-events-dead-letter-v1",
+        "ack_deadline_seconds": DEFAULT_ACK_DEADLINE_SECONDS,
+    }
+
+
+def test_dead_letter_inspection_subscription_targets_dead_letter_topic() -> None:
+    subscriber_client = FakeSubscriberClient(dead_letter_subscription_exists=False)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.dead_letter_subscription_id == CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID
+    assert result.dead_letter_subscription_path == (
+        "projects/supplychain-local/subscriptions/canonical-events-dead-letter-inspection-v1"
+    )
+    assert subscriber_client.create_subscription_requests[-1]["topic"] == (
+        "projects/supplychain-local/topics/canonical-events-dead-letter-v1"
+    )
+
+
+def test_existing_dead_letter_inspection_subscription_is_idempotent() -> None:
+    subscriber_client = FakeSubscriberClient(dead_letter_subscription_exists=True)
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.dead_letter_subscription_created is False
+    assert result.dead_letter_subscription_recreated is False
+
+
+def test_dead_letter_inspection_subscription_with_unexpected_topic_is_recreated_locally() -> None:
+    subscriber_client = FakeSubscriberClient(
+        dead_letter_subscription_topic="projects/other/topics/wrong-dlq",
+    )
+
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=subscriber_client,
+    )
+
+    assert result.dead_letter_subscription_recreated is True
+    assert subscriber_client.delete_subscription_requests[-1] == {
+        "subscription": (
+            "projects/supplychain-local/subscriptions/canonical-events-dead-letter-inspection-v1"
+        )
+    }
+    assert subscriber_client.create_subscription_requests[-1]["topic"] == (
+        "projects/supplychain-local/topics/canonical-events-dead-letter-v1"
+    )
 
 
 def test_topology_bootstrap_remains_blocked_without_emulator_config() -> None:
@@ -690,7 +866,7 @@ def test_topology_bootstrap_remains_blocked_without_emulator_config() -> None:
         )
 
 
-def test_subscription_bootstrap_does_not_configure_advanced_features() -> None:
+def test_subscription_bootstrap_configures_native_dead_letter_policy_only() -> None:
     subscriber_client = FakeSubscriberClient(subscription_exists=False)
 
     ensure_local_pubsub_emulator_topology(
@@ -704,11 +880,31 @@ def test_subscription_bootstrap_does_not_configure_advanced_features() -> None:
 
     request = subscriber_client.create_subscription_requests[0]
     assert request["ack_deadline_seconds"] == DEFAULT_ACK_DEADLINE_SECONDS
-    assert "dead_letter_policy" not in request
+    assert request["dead_letter_policy"] == {
+        "dead_letter_topic": "projects/supplychain-local/topics/canonical-events-dead-letter-v1",
+        "max_delivery_attempts": PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS,
+    }
     assert "retry_policy" not in request
     assert "enable_exactly_once_delivery" not in request
     assert "enable_message_ordering" not in request
     assert "filter" not in request
+
+
+def test_topology_bootstrap_reports_dead_letter_configuration() -> None:
+    result = ensure_local_pubsub_emulator_topology(
+        config=LocalPubSubEmulatorConfig(
+            emulator_host="127.0.0.1:8085",
+            project_id=LOCAL_PUBSUB_PROJECT_ID,
+        ),
+        publisher_client=FakePublisherClient(),
+        subscriber_client=FakeSubscriberClient(subscription_exists=False),
+    )
+
+    assert result.dead_letter_topic_id == CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID
+    assert result.dead_letter_topic_path == (
+        "projects/supplychain-local/topics/canonical-events-dead-letter-v1"
+    )
+    assert result.dead_letter_max_delivery_attempts == PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS
 
 
 def test_valid_serialized_canonical_event_deserializes() -> None:

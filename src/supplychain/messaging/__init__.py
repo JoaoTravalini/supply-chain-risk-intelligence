@@ -31,6 +31,8 @@ from supplychain.messaging.serialization import (
     validate_canonical_event_attributes,
 )
 from supplychain.messaging.topology import (
+    CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID,
+    CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID,
     CANONICAL_EVENTS_SUBSCRIPTION_ID,
     CANONICAL_EVENTS_TOPIC_ID,
     DEFAULT_ACK_DEADLINE_SECONDS,
@@ -38,6 +40,7 @@ from supplychain.messaging.topology import (
     DEFAULT_PULL_TIMEOUT_SECONDS,
     LOCAL_PUBSUB_PROJECT_ID,
     MAX_PULL_MESSAGES,
+    PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS,
     PUBSUB_EMULATOR_HOST_ENV,
     PUBSUB_PROJECT_ID_ENV,
     LocalPubSubEmulatorConfig,
@@ -47,6 +50,8 @@ from supplychain.messaging.topology import (
 )
 
 __all__ = [
+    "CANONICAL_EVENTS_DEAD_LETTER_SUBSCRIPTION_ID",
+    "CANONICAL_EVENTS_DEAD_LETTER_TOPIC_ID",
     "CANONICAL_EVENTS_SUBSCRIPTION_ID",
     "CANONICAL_EVENTS_TOPIC_ID",
     "DEFAULT_ACK_DEADLINE_SECONDS",
@@ -55,6 +60,7 @@ __all__ = [
     "LOCAL_PUBSUB_PROJECT_ID",
     "MAX_PULL_MESSAGES",
     "MESSAGE_CONTENT_TYPE",
+    "PUBSUB_DEAD_LETTER_MAX_DELIVERY_ATTEMPTS",
     "PUBSUB_EMULATOR_HOST_ENV",
     "PUBSUB_PROJECT_ID_ENV",
     "LocalPubSubEmulatorBootstrapError",

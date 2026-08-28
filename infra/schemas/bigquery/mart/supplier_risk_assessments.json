@@ -1,0 +1,98 @@
+[
+  {
+    "name": "model_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Deterministic Supplier Risk Model version."
+  },
+  {
+    "name": "supplier_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier v1 logical master-data key."
+  },
+  {
+    "name": "assessed_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Explicit UTC assessment timestamp."
+  },
+  {
+    "name": "risk_score",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Overall deterministic 0..100 risk score."
+  },
+  {
+    "name": "risk_level",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Risk level derived from the overall risk score."
+  },
+  {
+    "name": "structural_score",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Structural supplier risk score from 0 through 100."
+  },
+  {
+    "name": "weather_score",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Weather risk score from 0 through 100."
+  },
+  {
+    "name": "seismic_score",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Seismic risk score from 0 through 100."
+  },
+  {
+    "name": "criticality_component",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Normalized structural criticality component from 0 through 1."
+  },
+  {
+    "name": "dependency_component",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Normalized structural dependency component from 0 through 1."
+  },
+  {
+    "name": "single_source_component",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Normalized single-source component from 0 through 1."
+  },
+  {
+    "name": "lead_time_component",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Normalized lead-time component from 0 through 1."
+  },
+  {
+    "name": "relevant_weather_event_count",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Count of relevant weather observations used as evidence."
+  },
+  {
+    "name": "relevant_seismic_event_count",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Count of relevant seismic events used as evidence."
+  },
+  {
+    "name": "evidence_deduplication_keys",
+    "type": "JSON",
+    "mode": "REQUIRED",
+    "description": "Deterministically ordered canonical event deduplication keys used as evidence."
+  },
+  {
+    "name": "dominant_factor",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Risk family with the largest weighted contribution."
+  }
+]

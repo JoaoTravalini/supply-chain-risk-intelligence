@@ -1,6 +1,6 @@
 # Data Architecture
 
-SupplyChain Sentinel uses a layered BigQuery analytical model. Stage 5 provisioned the RAW, CORE, and MART dataset boundaries in BigQuery Sandbox through OpenTofu. Stage 11 defines the first RAW/CORE physical objects and local warehouse runtime boundary, with cloud provisioning intentionally pending human review of the saved OpenTofu plan.
+SupplyChain Sentinel uses a layered BigQuery analytical model. Stage 5 provisioned the RAW, CORE, and MART dataset boundaries in BigQuery Sandbox through OpenTofu. Stage 11 deployed the first RAW/CORE physical objects and local warehouse runtime boundary. Stage 12 deploys the deterministic Supplier Risk Model v1 MART current/history tables.
 
 ## Analytical Layers
 
@@ -37,7 +37,12 @@ MART contains business-facing analytical models. It supports supplier risk analy
 
 MART should not be used as a raw ingestion landing area, and normal application workflows should not write directly to MART.
 
-MART physical business/risk models remain deferred to Stage 12.
+Stage 12 defines and deploys `supplychain_mart.supplier_risk_current` as the
+latest Supplier Risk Model v1 snapshot and
+`supplychain_mart.supplier_risk_history` as append-oriented assessment history.
+One full 120-Supplier development assessment batch was loaded for validation.
+Live environmental factor scores depend on qualifying CORE weather and seismic
+evidence.
 
 ## Intended Flow
 
@@ -63,7 +68,19 @@ MART
 
 The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription. Stage 10C can coordinate one already-valid received Canonical Event through ledger assessment, handler execution, successful ledger mutation, ACK, failure classification, and bounded disposition intent. Stage 11 adds a `BigQueryCanonicalEventHandler` that appends approved events to RAW through a batch load job before handler success returns to the ProcessingCoordinator.
 
-Pub/Sub is transport, not the system of record. ProcessingLedger is synchronous operational idempotency and revision index state used for safe processing and ACK decisions. BigQuery RAW is canonical version/history storage. BigQuery CORE canonical events are authoritative query-time current state over RAW. CORE suppliers are master-data snapshot state. MART remains the deferred business/risk model layer.
+Pub/Sub is transport, not the system of record. ProcessingLedger is synchronous operational idempotency and revision index state used for safe processing and ACK decisions. BigQuery RAW is canonical version/history storage. BigQuery CORE canonical events are authoritative query-time current state over RAW. CORE suppliers are master-data snapshot state. Stage 12 MART contains deterministic supplier risk assessments derived from CORE.
+
+Stage 12 risk progression:
+
+```text
+CORE suppliers
++ CORE canonical events
+-> deterministic risk engine
+-> MART current/history
+```
+
+LangGraph will later read and explain MART risk outputs. It does not calculate
+authoritative risk scores.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 

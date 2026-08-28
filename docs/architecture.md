@@ -82,11 +82,13 @@ Stage 10C.2B adds bounded disposition policy and local native Pub/Sub
 dead-letter topology for valid-event processing failures. Stage 10C.2B.1 adds a
 local dead-letter inspection subscription and clarifies that managed Pub/Sub
 dead-letter forwarding is best effort, not an exact delivery-attempt guarantee.
-Stage 11 implements the local BigQuery RAW/CORE warehouse boundary, table/view
-definitions, RAW load-job handler, and Supplier snapshot loader. Cloud
-provisioning is pending human review of the saved OpenTofu plan. Worker runtime,
-DLQ consumption/replay, live warehouse loads, MART models, and BigQuery apply
-remain deferred.
+Stage 11 implements and deploys the local BigQuery RAW/CORE warehouse boundary,
+table/view definitions, RAW load-job handler, and Supplier snapshot loader.
+Stage 12 implements deterministic Supplier Risk Model v1, CORE risk input
+reading, MART current/history loaders, and deployed MART table definitions. One
+full 120-Supplier development assessment batch was loaded for validation. Worker
+runtime, DLQ consumption/replay, production scheduling, and production Pub/Sub
+IaC remain deferred.
 
 Target flow:
 
@@ -156,6 +158,19 @@ Supplier v1 snapshot
 
 Supplier loading is not part of per-event Canonical Event processing.
 
+Stage 12 defines the deterministic risk path:
+
+```text
+CORE suppliers
++ CORE canonical_events
+-> Deterministic Supplier Risk Model v1
+-> MART supplier_risk_history
+-> MART supplier_risk_current
+```
+
+LangGraph will later read and explain MART outputs. It does not calculate the
+authoritative risk score.
+
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 
 ## BigQuery Conceptual Layers
@@ -192,17 +207,14 @@ Partitioning, clustering, and query-cost controls are future mandatory concerns.
 
 ## Supplier Risk Architecture
 
-Supplier risk will eventually combine deterministic factors such as:
+Stage 12 Supplier Risk Model v1 combines exactly these deterministic factor
+families:
 
-- Operational performance.
-- Delivery reliability.
+- Structural supplier risk.
 - Weather exposure.
 - Seismic exposure.
-- Supplier criticality.
 
-The exact formula and weights are intentionally not defined in Stage 0.
-
-Risk calculation must eventually expose:
+Risk calculation exposes:
 
 - Total risk score.
 - Component scores.

@@ -11,6 +11,7 @@ from supplychain.contracts import CanonicalEvent
 from supplychain.domain import Supplier
 from supplychain.processing.fingerprints import generate_source_content_fingerprint
 from supplychain.processing.revisions import extract_source_revision
+from supplychain.risk import SupplierRiskAssessment
 
 type BigQueryScalar = str | int | float | bool | None
 type BigQueryValue = BigQueryScalar | JsonValue
@@ -65,6 +66,29 @@ def supplier_to_core_row(supplier: Supplier) -> BigQueryRow:
         "typical_lead_time_days": supplier.typical_lead_time_days,
         "dependency_score": supplier.dependency_score,
         "single_source": supplier.single_source,
+    }
+
+
+def risk_assessment_to_mart_row(assessment: SupplierRiskAssessment) -> BigQueryRow:
+    """Map one validated SupplierRiskAssessment to the MART risk table row shape."""
+
+    return {
+        "model_version": assessment.model_version,
+        "supplier_id": assessment.supplier_id,
+        "assessed_at": _format_timestamp(assessment.assessed_at),
+        "risk_score": assessment.risk_score,
+        "risk_level": assessment.risk_level.value,
+        "structural_score": assessment.structural_score,
+        "weather_score": assessment.weather_score,
+        "seismic_score": assessment.seismic_score,
+        "criticality_component": assessment.structural.criticality_component,
+        "dependency_component": assessment.structural.dependency_component,
+        "single_source_component": assessment.structural.single_source_component,
+        "lead_time_component": assessment.structural.lead_time_component,
+        "relevant_weather_event_count": assessment.relevant_weather_event_count,
+        "relevant_seismic_event_count": assessment.relevant_seismic_event_count,
+        "evidence_deduplication_keys": list(assessment.evidence_deduplication_keys),
+        "dominant_factor": assessment.dominant_factor.value,
     }
 
 

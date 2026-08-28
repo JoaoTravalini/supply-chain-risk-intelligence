@@ -2,7 +2,7 @@
 
 This directory contains the OpenTofu root module for SupplyChain Sentinel.
 
-Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. Stage 11 defines the first RAW/CORE table and view resources. Applying those resources is intentionally gated on human review of the saved Stage 11 OpenTofu plan.
+Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. Stage 11 defines and deploys the first RAW/CORE table and view resources. Stage 12 defines and deploys MART supplier risk current/history resources after human review of the saved Stage 12 OpenTofu plan.
 
 ## Requirements
 
@@ -42,9 +42,16 @@ These datasets represent analytical boundaries. Stage 11 adds exactly these BigQ
 - `supplychain_core.canonical_events`: revision-safe current Canonical Event view over RAW.
 - `supplychain_core.suppliers`: Supplier v1 master-data snapshot table.
 
-No MART tables, routines, dataset access blocks, IAM bindings, external
-connections, reservations, encryption resources, provider-specific RAW tables,
-or production Pub/Sub resources are defined in Stage 11.
+Stage 12 adds exactly these MART table definitions:
+
+- `supplychain_mart.supplier_risk_current`: latest deterministic Supplier Risk
+  Model v1 snapshot.
+- `supplychain_mart.supplier_risk_history`: append-oriented deterministic
+  Supplier Risk Model v1 assessment history.
+
+No MART routines, dataset access blocks, IAM bindings, external connections,
+reservations, encryption resources, provider-specific RAW tables, or production
+Pub/Sub resources are defined in Stage 12.
 
 The datasets are managed by OpenTofu in BigQuery Sandbox during billing-free development. Sandbox validation does not cover production streaming behavior, because streaming is unavailable without billing.
 

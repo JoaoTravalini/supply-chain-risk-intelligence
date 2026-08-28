@@ -13,5 +13,7 @@ output "bigquery_table_ids" {
     raw_canonical_events  = google_bigquery_table.raw_canonical_events.table_id
     core_canonical_events = google_bigquery_table.core_canonical_events.table_id
     core_suppliers        = google_bigquery_table.core_suppliers.table_id
+    mart_risk_current     = google_bigquery_table.mart_supplier_risk_current.table_id
+    mart_risk_history     = google_bigquery_table.mart_supplier_risk_history.table_id
   }
 }

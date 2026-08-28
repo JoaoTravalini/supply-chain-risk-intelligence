@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "RiskFactorFamily": {
+      "description": "Risk factor families calculated by model v1.",
+      "enum": [
+        "STRUCTURAL",
+        "WEATHER",
+        "SEISMIC"
+      ],
+      "title": "RiskFactorFamily",
+      "type": "string"
+    },
+    "RiskLevel": {
+      "description": "Approved v1 risk levels.",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH",
+        "CRITICAL"
+      ],
+      "title": "RiskLevel",
+      "type": "string"
+    },
+    "StructuralRiskBreakdown": {
+      "additionalProperties": false,
+      "description": "Normalized 0..1 structural factor components.",
+      "properties": {
+        "criticality_component": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Criticality Component",
+          "type": "number"
+        },
+        "dependency_component": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Dependency Component",
+          "type": "number"
+        },
+        "single_source_component": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Single Source Component",
+          "type": "number"
+        },
+        "lead_time_component": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Lead Time Component",
+          "type": "number"
+        }
+      },
+      "required": [
+        "criticality_component",
+        "dependency_component",
+        "single_source_component",
+        "lead_time_component"
+      ],
+      "title": "StructuralRiskBreakdown",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Deterministic Supplier Risk Model v1 assessment output.",
+  "properties": {
+    "model_version": {
+      "default": "1.0.0",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+      "title": "Model Version",
+      "type": "string"
+    },
+    "supplier_id": {
+      "pattern": "^SUP-\\d{6}$",
+      "title": "Supplier Id",
+      "type": "string"
+    },
+    "assessed_at": {
+      "format": "date-time",
+      "title": "Assessed At",
+      "type": "string"
+    },
+    "risk_score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Risk Score",
+      "type": "number"
+    },
+    "risk_level": {
+      "$ref": "#/$defs/RiskLevel"
+    },
+    "structural_score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Structural Score",
+      "type": "number"
+    },
+    "weather_score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Weather Score",
+      "type": "number"
+    },
+    "seismic_score": {
+      "maximum": 100.0,
+      "minimum": 0.0,
+      "title": "Seismic Score",
+      "type": "number"
+    },
+    "structural": {
+      "$ref": "#/$defs/StructuralRiskBreakdown"
+    },
+    "relevant_weather_event_count": {
+      "minimum": 0,
+      "title": "Relevant Weather Event Count",
+      "type": "integer"
+    },
+    "relevant_seismic_event_count": {
+      "minimum": 0,
+      "title": "Relevant Seismic Event Count",
+      "type": "integer"
+    },
+    "evidence_deduplication_keys": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "title": "Evidence Deduplication Keys",
+      "type": "array"
+    },
+    "dominant_factor": {
+      "$ref": "#/$defs/RiskFactorFamily"
+    }
+  },
+  "required": [
+    "supplier_id",
+    "assessed_at",
+    "risk_score",
+    "risk_level",
+    "structural_score",
+    "weather_score",
+    "seismic_score",
+    "structural",
+    "relevant_weather_event_count",
+    "relevant_seismic_event_count",
+    "evidence_deduplication_keys",
+    "dominant_factor"
+  ],
+  "title": "SupplierRiskAssessment",
+  "type": "object"
+}

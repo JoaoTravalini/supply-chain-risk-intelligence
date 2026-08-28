@@ -112,6 +112,14 @@ These standards define future project conventions. They are part of the Stage 0 
   complete event payloads.
 - BigQuery load-job failure occurs before ProcessingCoordinator handler success,
   ledger `record_success`, and ACK.
+- Deterministic risk calculations must be versioned and must use explicit
+  assessment timestamps, centralized model constants, and reproducible
+  rounding.
+- LLMs must not calculate or overwrite authoritative supplier risk scores.
+- Risk evidence must use canonical application identities such as Canonical
+  Event deduplication keys, not transport identifiers.
+- MART risk tables must contain assessment outputs and evidence identities, not
+  raw provider payload dumps or Pub/Sub transport metadata.
 
 ## Security
 

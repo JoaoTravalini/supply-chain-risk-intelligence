@@ -102,3 +102,39 @@ resource "google_bigquery_table" "core_suppliers" {
     data_layer = "core"
   })
 }
+
+resource "google_bigquery_table" "mart_supplier_risk_current" {
+  dataset_id          = google_bigquery_dataset.mart.dataset_id
+  table_id            = "supplier_risk_current"
+  friendly_name       = "MART Supplier Risk Current"
+  description         = "Latest deterministic Supplier Risk Model v1 assessment snapshot loaded through BigQuery batch load jobs."
+  deletion_protection = false
+  schema              = file("${path.module}/schemas/bigquery/mart/supplier_risk_assessments.json")
+
+  labels = merge(local.common_dataset_labels, {
+    data_layer = "mart"
+  })
+}
+
+resource "google_bigquery_table" "mart_supplier_risk_history" {
+  dataset_id          = google_bigquery_dataset.mart.dataset_id
+  table_id            = "supplier_risk_history"
+  friendly_name       = "MART Supplier Risk History"
+  description         = "Append-oriented deterministic Supplier Risk Model v1 assessment history loaded through BigQuery batch load jobs."
+  deletion_protection = false
+  schema              = file("${path.module}/schemas/bigquery/mart/supplier_risk_assessments.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "assessed_at"
+  }
+
+  clustering = [
+    "risk_level",
+    "supplier_id",
+  ]
+
+  labels = merge(local.common_dataset_labels, {
+    data_layer = "mart"
+  })
+}

@@ -9,7 +9,7 @@ from typing import Protocol, cast
 from uuid import UUID
 
 from google.api_core.exceptions import AlreadyExists, GoogleAPICallError, NotFound, RetryError
-from google.cloud import pubsub_v1  # type: ignore[import-untyped]
+from google.cloud import pubsub_v1  # type: ignore[attr-defined]
 
 from supplychain.contracts import CanonicalEvent
 from supplychain.messaging.errors import (

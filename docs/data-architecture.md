@@ -1,6 +1,6 @@
 # Data Architecture
 
-SupplyChain Sentinel uses a layered BigQuery analytical model. Stage 5 has provisioned the RAW, CORE, and MART dataset boundaries in BigQuery Sandbox through OpenTofu. It does not create tables, define schemas, load data, or implement transformations.
+SupplyChain Sentinel uses a layered BigQuery analytical model. Stage 5 provisioned the RAW, CORE, and MART dataset boundaries in BigQuery Sandbox through OpenTofu. Stage 11 defines the first RAW/CORE physical objects and local warehouse runtime boundary, with cloud provisioning intentionally pending human review of the saved OpenTofu plan.
 
 ## Analytical Layers
 
@@ -10,17 +10,34 @@ RAW preserves ingested source records and source fidelity wherever practical. It
 
 RAW is not the preferred user-facing query layer. Consumers should use CORE or MART when the required information has been validated and modeled there.
 
+Stage 11 defines `supplychain_raw.canonical_events` as an append-oriented
+Canonical Event v1 source-version history table populated by BigQuery batch load
+jobs. RAW is not a Pub/Sub transport-delivery log and does not store `ack_id`,
+delivery attempts, retry counters, or DLQ state. Exact duplicate RAW rows are
+possible after partial failures or replay and must be tolerated.
+
 ### CORE
 
 CORE contains the canonical typed business representation. It is the boundary for normalized, validated, and deduplicated domain-oriented records.
 
 CORE is the preferred source for reusable domain data and agent tools when MART does not yet provide the required analytical model.
 
+Stage 11 defines `supplychain_core.canonical_events` as a BigQuery view over RAW
+that exposes authoritative query-time current canonical state. The view
+collapses exact duplicates, chooses the greatest comparable source revision
+where available, and excludes unversioned, equal-revision, or mixed
+revision-marker conflicts instead of using blind last-arrival-wins behavior.
+
+Stage 11 also defines `supplychain_core.suppliers` as the Supplier v1
+master-data snapshot table. Its logical key is `supplier_id`.
+
 ### MART
 
 MART contains business-facing analytical models. It supports supplier risk analytics, historical risk, factor decomposition, dashboards, and optimized consumption by Streamlit and LangGraph data tools.
 
 MART should not be used as a raw ingestion landing area, and normal application workflows should not write directly to MART.
+
+MART physical business/risk models remain deferred to Stage 12.
 
 ## Intended Flow
 
@@ -44,13 +61,13 @@ Business Transformations
 MART
 ```
 
-The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription. Stage 10C can coordinate one already-valid received Canonical Event through ledger assessment, handler execution, successful ledger mutation, ACK, failure classification, and bounded disposition intent. Stage 10C.2B.1 adds a local `canonical-events-dead-letter-inspection-v1` subscription attached to the dead-letter topic for future inspection or reprocessing.
+The Canonical Event v1 contract now exists as the platform boundary for future source normalization. The Open-Meteo adapter can canonicalize current-weather observations into Canonical Event v1 in local code, and the USGS adapter can canonicalize bounded nearby earthquake query results into Canonical Event v1. Stage 9 allows Canonical Events to cross the local Pub/Sub messaging boundary through the `canonical-events-v1` topic and return as validated Canonical Events through the `canonical-events-processing-v1` pull subscription. Stage 10C can coordinate one already-valid received Canonical Event through ledger assessment, handler execution, successful ledger mutation, ACK, failure classification, and bounded disposition intent. Stage 11 adds a `BigQueryCanonicalEventHandler` that appends approved events to RAW through a batch load job before handler success returns to the ProcessingCoordinator.
 
-Pub/Sub is transport, not the system of record. Stage 10C does not load BigQuery, create physical RAW event tables, persist provider events to the warehouse, implement worker loops, consume or replay DLQ messages, or directly route messages to a DLQ outside native Pub/Sub policy. Native Pub/Sub dead-letter forwarding remains best effort. Future RAW and CORE ingestion must preserve event identity, source provenance, schema version, event time, ingestion time, correlation metadata, deduplication metadata, source-content equality, and provider revision semantics.
+Pub/Sub is transport, not the system of record. ProcessingLedger is synchronous operational idempotency and revision index state used for safe processing and ACK decisions. BigQuery RAW is canonical version/history storage. BigQuery CORE canonical events are authoritative query-time current state over RAW. CORE suppliers are master-data snapshot state. MART remains the deferred business/risk model layer.
 
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
-The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. Canonical Supplier master data now exists as a versioned synthetic JSONL artifact validated through the Supplier v1 contract. It has not been loaded into BigQuery, no physical CORE supplier table exists yet, and warehouse representation remains deferred.
+The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. Canonical Supplier master data now exists as a versioned synthetic JSONL artifact validated through the Supplier v1 contract. Stage 11 defines the physical CORE supplier table and batch snapshot loader, but the live load remains deferred until after human approval of the OpenTofu plan and apply checkpoint.
 
 The analytical progression is intentionally one-way. Later stages may define controlled rebuild or replay workflows, but those workflows should preserve the same layer responsibilities.
 
@@ -77,13 +94,14 @@ Source-event identity and source revision must remain distinct. For USGS, the st
 
 Stage 10A introduces the source-content fingerprint as a separate deterministic concept from logical `deduplication_key`. Future RAW and CORE processing must preserve the distinction between the same logical source event with identical content and the same logical source event with changed content. Changed content with the same logical identity is a revision candidate, not something to discard blindly as a transport duplicate.
 
-Stage 10B adds a local processing ledger. The ledger is not RAW and is not the analytical warehouse. It stores only idempotency/revision index metadata: logical key, source-content fingerprint, supported source revision marker, and safe event identity metadata. Full Canonical Events and source payloads will be persisted by future RAW architecture.
+Stage 10B adds a local processing ledger. The ledger is not RAW and is not the analytical warehouse. It stores only idempotency/revision index metadata: logical key, source-content fingerprint, supported source revision marker, and safe event identity metadata. Stage 11 RAW persists full Canonical Event warehouse rows and source payloads separately from the ledger.
 
-The ledger prevents stale accepted revision state from overwriting a newer accepted revision for the same logical event. It does not define BigQuery table schemas, store RAW events, or write CORE records.
+The ledger prevents stale accepted revision state from overwriting a newer accepted revision for the same logical event. It is not a BigQuery table and is not used as the analytical source of record.
 
-The Stage 10C.1 processing coordinator uses the ledger as the gate for safe
-handler execution and ACK. It is not a warehouse sink and does not change RAW,
-CORE, or MART physical design.
+The ProcessingCoordinator uses the ledger as the gate for safe handler
+execution and ACK. The Stage 11 BigQuery handler is a downstream handler that
+must complete the RAW load before the coordinator records ledger success and
+ACKs. The handler does not ACK or mutate the ledger directly.
 
 MART should consume CORE or other approved modeled data rather than reimplementing raw deduplication logic independently.
 

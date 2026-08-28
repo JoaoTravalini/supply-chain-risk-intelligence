@@ -1,0 +1,86 @@
+[
+  {
+    "name": "schema_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier contract schema version."
+  },
+  {
+    "name": "supplier_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier v1 logical master-data key."
+  },
+  {
+    "name": "name",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier display name."
+  },
+  {
+    "name": "category",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier category taxonomy value."
+  },
+  {
+    "name": "criticality",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Operational criticality taxonomy value."
+  },
+  {
+    "name": "country_code",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier location country code."
+  },
+  {
+    "name": "region",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier location region."
+  },
+  {
+    "name": "city",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Supplier location city."
+  },
+  {
+    "name": "latitude",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Supplier location latitude."
+  },
+  {
+    "name": "longitude",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Supplier location longitude."
+  },
+  {
+    "name": "annual_spend_usd",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Annual spend in whole US dollars."
+  },
+  {
+    "name": "typical_lead_time_days",
+    "type": "INTEGER",
+    "mode": "REQUIRED",
+    "description": "Typical lead time in whole days."
+  },
+  {
+    "name": "dependency_score",
+    "type": "FLOAT",
+    "mode": "REQUIRED",
+    "description": "Supplier dependency score from 0.0 through 1.0."
+  },
+  {
+    "name": "single_source",
+    "type": "BOOLEAN",
+    "mode": "REQUIRED",
+    "description": "Whether this supplier is currently single-sourced."
+  }
+]

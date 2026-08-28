@@ -101,6 +101,17 @@ These standards define future project conventions. They are part of the Stage 0 
 - Future physical table designs must justify partitioning and clustering choices per table.
 - Destructive dataset behavior must be reviewed before infrastructure changes are applied.
 - BigQuery query bytes, quotas, and cost behavior are first-class design concerns.
+- Sandbox-compatible BigQuery write paths must use batch load jobs, not
+  streaming inserts, Storage Write API, or DML.
+- RAW canonical event storage is append-oriented and may contain exact duplicate
+  rows after replay or partial failure.
+- CORE canonical event current-state logic must not use blind
+  last-arrival-wins behavior for conflicting source content.
+- BigQuery is analytical storage, not the synchronous ProcessingLedger.
+- Canonical Event data remains authoritative; warehouse errors must not include
+  complete event payloads.
+- BigQuery load-job failure occurs before ProcessingCoordinator handler success,
+  ledger `record_success`, and ACK.
 
 ## Security
 

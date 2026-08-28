@@ -44,3 +44,61 @@ resource "google_bigquery_dataset" "mart" {
     data_layer = "mart"
   })
 }
+
+resource "google_bigquery_table" "raw_canonical_events" {
+  dataset_id          = google_bigquery_dataset.raw.dataset_id
+  table_id            = "canonical_events"
+  friendly_name       = "RAW Canonical Events"
+  description         = "Append-oriented Canonical Event v1 source-version history table populated through BigQuery batch load jobs."
+  deletion_protection = false
+  schema              = file("${path.module}/schemas/bigquery/raw/canonical_events.json")
+
+  time_partitioning {
+    type  = "DAY"
+    field = "ingested_at"
+  }
+
+  clustering = [
+    "event_type",
+    "source_provider",
+    "deduplication_key",
+  ]
+
+  labels = merge(local.common_dataset_labels, {
+    data_layer = "raw"
+  })
+}
+
+resource "google_bigquery_table" "core_canonical_events" {
+  dataset_id          = google_bigquery_dataset.core.dataset_id
+  table_id            = "canonical_events"
+  friendly_name       = "CORE Canonical Events"
+  description         = "Sandbox-compatible current Canonical Event view over RAW history with revision-safe conflict exclusion."
+  deletion_protection = false
+
+  view {
+    query = templatefile("${path.module}/sql/core/canonical_events.sql", {
+      project_id     = var.project_id
+      raw_dataset_id = google_bigquery_dataset.raw.dataset_id
+      raw_table_id   = google_bigquery_table.raw_canonical_events.table_id
+    })
+    use_legacy_sql = false
+  }
+
+  labels = merge(local.common_dataset_labels, {
+    data_layer = "core"
+  })
+}
+
+resource "google_bigquery_table" "core_suppliers" {
+  dataset_id          = google_bigquery_dataset.core.dataset_id
+  table_id            = "suppliers"
+  friendly_name       = "CORE Suppliers"
+  description         = "Supplier v1 master-data snapshot table loaded through BigQuery batch load jobs."
+  deletion_protection = false
+  schema              = file("${path.module}/schemas/bigquery/core/suppliers.json")
+
+  labels = merge(local.common_dataset_labels, {
+    data_layer = "core"
+  })
+}

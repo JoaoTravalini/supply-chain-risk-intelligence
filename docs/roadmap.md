@@ -31,8 +31,8 @@ Stages may be subdivided if their scope becomes too large.
      - 10C.1. Processing Coordinator & Safe ACK Ordering
      - 10C.2A. Processing Failure Classification Contract
      - 10C.2B. Retry Budget, Redelivery, Poison Handling & DLQ
-      - 10C.2B.1. Dead-Letter Retention & Semantics Hardening
-11. RAW -> CORE -> MART Transformations
+     - 10C.2B.1. Dead-Letter Retention & Semantics Hardening
+11. BigQuery RAW/CORE Data Pipeline
 12. Deterministic Risk Engine
 
 ## Agentic AI
@@ -50,6 +50,6 @@ Stages may be subdivided if their scope becomes too large.
 
 ## Current Stage
 
-Stage 10 is complete. Stage 10A adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`. Stage 10B adds the local persistent processing ledger, schema version 1, revision-marker extraction for USGS seismic events, and ledger-aware `NEW`, `DUPLICATE`, `NEWER_REVISION`, `STALE_REVISION`, and `REVISION_CONFLICT` resolution. Stage 10C.1 adds a one-message processing coordinator for valid Canonical Events with safe handler, ledger `record_success`, and ACK ordering. Stage 10C.2A adds failure classification for declared handler failures, unexpected exceptions, and revision conflicts without transport disposition. Stage 10C.2B adds bounded redelivery/dead-letter disposition policy, native local Pub/Sub DLQ topology, and one-delivery runtime coordination without an application retry loop. Stage 10C.2B.1 adds the local DLQ inspection subscription and clarifies that native Pub/Sub dead-letter forwarding is best effort rather than an exact delivery-attempt guarantee.
+Stage 11 is complete. Stage 10A adds pure processing decision semantics, deterministic source-content fingerprints, a minimal prior-record value object, and local classifier behavior for `NEW`, `DUPLICATE`, and `REVISION_CANDIDATE`. Stage 10B adds the local persistent processing ledger, schema version 1, revision-marker extraction for USGS seismic events, and ledger-aware `NEW`, `DUPLICATE`, `NEWER_REVISION`, `STALE_REVISION`, and `REVISION_CONFLICT` resolution. Stage 10C adds safe processing coordination, failure classification, bounded redelivery/dead-letter disposition policy, native local Pub/Sub DLQ topology, and the local DLQ inspection subscription. Stage 11 defines and deploys `supplychain_raw.canonical_events`, the `supplychain_core.canonical_events` view, `supplychain_core.suppliers`, and the batch-load warehouse runtime boundary.
 
-Provider data is not persisted to RAW or CORE. Production Pub/Sub IaC, production DLQ IAM, DLQ consumption/replay, long-running worker runtime, automatic ack-deadline extension, physical BigQuery external-event tables, warehouse loading, transformations, revision-aware CORE persistence, and risk scoring remain deferred.
+The human-approved Stage 11 OpenTofu plan was applied with three BigQuery objects added and no destroys. The Supplier snapshot was loaded once for validation, and one synthetic Canonical Event RAW/CORE smoke validated the batch-load handler path. Production Pub/Sub IaC, production DLQ IAM, DLQ consumption/replay, long-running worker runtime, automatic ack-deadline extension, production-scale batching, MART risk models, LangGraph, and Streamlit remain deferred.

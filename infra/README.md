@@ -2,7 +2,7 @@
 
 This directory contains the OpenTofu root module for SupplyChain Sentinel.
 
-Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. It does not define tables, schemas, views, data loads, or transformations.
+Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. Stage 11 defines the first RAW/CORE table and view resources. Applying those resources is intentionally gated on human review of the saved Stage 11 OpenTofu plan.
 
 ## Requirements
 
@@ -36,13 +36,21 @@ The root module declares exactly three BigQuery datasets:
 - `supplychain_core`
 - `supplychain_mart`
 
-These datasets represent analytical boundaries only. No table resources, schemas, views, routines, dataset access blocks, IAM bindings, external connections, reservations, or encryption resources are defined in Stage 5A.
+These datasets represent analytical boundaries. Stage 11 adds exactly these BigQuery objects:
+
+- `supplychain_raw.canonical_events`: append-oriented Canonical Event v1 history table.
+- `supplychain_core.canonical_events`: revision-safe current Canonical Event view over RAW.
+- `supplychain_core.suppliers`: Supplier v1 master-data snapshot table.
+
+No MART tables, routines, dataset access blocks, IAM bindings, external
+connections, reservations, encryption resources, provider-specific RAW tables,
+or production Pub/Sub resources are defined in Stage 11.
 
 The datasets are managed by OpenTofu in BigQuery Sandbox during billing-free development. Sandbox validation does not cover production streaming behavior, because streaming is unavailable without billing.
 
-BigQuery Sandbox enforces 60-day expiration for tables and partitions. The root module represents this development behavior explicitly with `bigquery_sandbox_default_expiration_ms`; this is not a production retention policy. Future production deployment must redesign retention separately for RAW, CORE, and MART based on business, compliance, cost, and replay requirements.
+BigQuery Sandbox enforces 60-day expiration for tables and partitions. The root module represents this development behavior explicitly with dataset-level `bigquery_sandbox_default_expiration_ms`; this is not a production retention policy. Stage 11 table resources do not hardcode absolute expiration timestamps and are expected to inherit the dataset default behavior. Future production deployment must redesign retention separately for RAW, CORE, and MART based on business, compliance, cost, and replay requirements.
 
-Datasets are persistent analytical boundaries. The module deliberately does not set `delete_contents_on_destroy = true`; accidental infrastructure destroy operations must not silently delete future dataset contents.
+Datasets are persistent analytical boundaries. The module deliberately does not set `delete_contents_on_destroy = true`; accidental infrastructure destroy operations must not silently delete future dataset contents. Stage 11 table resources set `deletion_protection = false` to stay consistent with the disposable billing-free Sandbox development environment; production deletion behavior must be reviewed separately.
 
 ## Variables
 

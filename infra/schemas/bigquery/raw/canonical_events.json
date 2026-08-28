@@ -1,0 +1,122 @@
+[
+  {
+    "name": "event_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Canonical event instance UUID."
+  },
+  {
+    "name": "event_type",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Approved Canonical Event v1 event type."
+  },
+  {
+    "name": "schema_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Canonical Event schema version."
+  },
+  {
+    "name": "event_time",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Source/business event timestamp."
+  },
+  {
+    "name": "ingested_at",
+    "type": "TIMESTAMP",
+    "mode": "REQUIRED",
+    "description": "Platform canonicalization/warehouse arrival timestamp."
+  },
+  {
+    "name": "source_provider",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Source provider identifier."
+  },
+  {
+    "name": "source_endpoint",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Safe optional source endpoint/reference without secrets."
+  },
+  {
+    "name": "source_event_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Stable source event identity within the provider namespace."
+  },
+  {
+    "name": "source_request_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Optional source retrieval request identifier."
+  },
+  {
+    "name": "entity_type",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Optional associated platform entity type."
+  },
+  {
+    "name": "entity_id",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Optional associated platform entity identifier."
+  },
+  {
+    "name": "location_country_code",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Optional uppercase ISO-like two-letter country code."
+  },
+  {
+    "name": "location_region",
+    "type": "STRING",
+    "mode": "NULLABLE",
+    "description": "Optional minimal region reference."
+  },
+  {
+    "name": "correlation_id",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Workflow/request lineage identifier."
+  },
+  {
+    "name": "producer",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Component that produced the Canonical Event."
+  },
+  {
+    "name": "producer_version",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Semantic-version-like producer version."
+  },
+  {
+    "name": "deduplication_key",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Stable logical source event identity key."
+  },
+  {
+    "name": "source_content_fingerprint",
+    "type": "STRING",
+    "mode": "REQUIRED",
+    "description": "Deterministic source-content fingerprint."
+  },
+  {
+    "name": "source_revision_at",
+    "type": "TIMESTAMP",
+    "mode": "NULLABLE",
+    "description": "Comparable source revision timestamp where explicitly supported."
+  },
+  {
+    "name": "payload",
+    "type": "JSON",
+    "mode": "REQUIRED",
+    "description": "Canonical event-specific payload as native BigQuery JSON."
+  }
+]

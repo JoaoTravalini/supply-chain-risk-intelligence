@@ -82,8 +82,11 @@ Stage 10C.2B adds bounded disposition policy and local native Pub/Sub
 dead-letter topology for valid-event processing failures. Stage 10C.2B.1 adds a
 local dead-letter inspection subscription and clarifies that managed Pub/Sub
 dead-letter forwarding is best effort, not an exact delivery-attempt guarantee.
-Provider data is not persisted yet. Worker runtime, DLQ consumption/replay,
-warehouse sinks, and BigQuery loading are not implemented yet.
+Stage 11 implements the local BigQuery RAW/CORE warehouse boundary, table/view
+definitions, RAW load-job handler, and Supplier snapshot loader. Cloud
+provisioning is pending human review of the saved OpenTofu plan. Worker runtime,
+DLQ consumption/replay, live warehouse loads, MART models, and BigQuery apply
+remain deferred.
 
 Target flow:
 
@@ -108,8 +111,8 @@ External Provider
    -> ACK / bounded disposition decision
    -> Redelivery / native DLQ path when needed
 -> Event processor
--> BigQuery RAW
--> BigQuery CORE
+-> BigQuery RAW canonical_events batch load
+-> BigQuery CORE canonical_events view
 -> BigQuery MART
 -> Deterministic supplier risk engine
 -> LangGraph investigation workflow
@@ -127,6 +130,31 @@ dead-letter policy in local topology. Stage 10C.2B.1 adds the local
 state, consume or replay DLQ messages, manually republish DLQ messages, or write
 Pub/Sub events to BigQuery. Pub/Sub-to-BigQuery ingestion is not operational
 yet.
+
+Stage 11 defines the intended per-event warehouse integration:
+
+```text
+ProcessingCoordinator
+-> BigQueryCanonicalEventHandler
+-> RAW load job completion
+-> handler success
+-> ProcessingLedger.record_success
+-> ACK
+```
+
+The handler does not ACK Pub/Sub and does not mutate the ProcessingLedger
+directly. Because `supplychain_core.canonical_events` is a view over
+`supplychain_raw.canonical_events`, there is no per-event CORE DML step.
+
+Supplier v1 master data uses a separate snapshot flow:
+
+```text
+Supplier v1 snapshot
+-> BigQuerySupplierSnapshotLoader
+-> supplychain_core.suppliers
+```
+
+Supplier loading is not part of per-event Canonical Event processing.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 

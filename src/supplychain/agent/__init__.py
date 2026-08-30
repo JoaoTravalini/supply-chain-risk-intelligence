@@ -5,6 +5,29 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from supplychain.agent.data import (
+        AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV,
+        DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED,
+        DEFAULT_RISK_HISTORY_LIMIT,
+        MAX_EVIDENCE_KEYS,
+        MAX_RISK_HISTORY_LIMIT,
+        SUPPLYCHAIN_GCP_PROJECT_ID_ENV,
+        AgentBigQueryConfig,
+        AgentDataConfigurationError,
+        AgentDataError,
+        AgentDataIntegrityError,
+        AgentDataNotFoundError,
+        AgentDataQueryError,
+        AgentDataService,
+        GuardedBigQueryReader,
+        QueryBudgetExceededError,
+        RiskEvidenceInput,
+        RiskHistoryInput,
+        SupplierLookupInput,
+        agent_bigquery_config_from_env,
+        agent_data_service_from_env,
+        approved_agent_data_tools,
+    )
     from supplychain.agent.errors import (
         AgentConfigurationError,
         AgentError,
@@ -23,17 +46,38 @@ if TYPE_CHECKING:
     from supplychain.agent.service import InvestigationService, thread_config
 
 __all__ = [
+    "AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV",
     "AGENT_POSTGRES_DSN_ENV",
+    "DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED",
+    "DEFAULT_RISK_HISTORY_LIMIT",
+    "MAX_EVIDENCE_KEYS",
+    "MAX_RISK_HISTORY_LIMIT",
+    "SUPPLYCHAIN_GCP_PROJECT_ID_ENV",
+    "AgentBigQueryConfig",
     "AgentConfigurationError",
+    "AgentDataConfigurationError",
+    "AgentDataError",
+    "AgentDataIntegrityError",
+    "AgentDataNotFoundError",
+    "AgentDataQueryError",
+    "AgentDataService",
     "AgentError",
     "AgentPersistenceError",
     "CreateInvestigationRequest",
+    "GuardedBigQueryReader",
     "InvestigationIdentity",
     "InvestigationNotFoundError",
     "InvestigationService",
     "InvestigationSnapshot",
     "InvestigationState",
     "InvestigationStatus",
+    "QueryBudgetExceededError",
+    "RiskEvidenceInput",
+    "RiskHistoryInput",
+    "SupplierLookupInput",
+    "agent_bigquery_config_from_env",
+    "agent_data_service_from_env",
+    "approved_agent_data_tools",
     "build_investigation_graph",
     "thread_config",
 ]
@@ -42,6 +86,32 @@ __all__ = [
 def __getattr__(name: str) -> Any:
     """Load public agent symbols lazily to keep module entrypoints clean."""
 
+    if name in {
+        "AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV",
+        "DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED",
+        "DEFAULT_RISK_HISTORY_LIMIT",
+        "MAX_EVIDENCE_KEYS",
+        "MAX_RISK_HISTORY_LIMIT",
+        "SUPPLYCHAIN_GCP_PROJECT_ID_ENV",
+        "AgentBigQueryConfig",
+        "AgentDataConfigurationError",
+        "AgentDataError",
+        "AgentDataIntegrityError",
+        "AgentDataNotFoundError",
+        "AgentDataQueryError",
+        "AgentDataService",
+        "GuardedBigQueryReader",
+        "QueryBudgetExceededError",
+        "RiskEvidenceInput",
+        "RiskHistoryInput",
+        "SupplierLookupInput",
+        "agent_bigquery_config_from_env",
+        "agent_data_service_from_env",
+        "approved_agent_data_tools",
+    }:
+        from supplychain.agent import data
+
+        return getattr(data, name)
     if name in {
         "AgentConfigurationError",
         "AgentError",

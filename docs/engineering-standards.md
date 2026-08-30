@@ -131,6 +131,17 @@ These standards define future project conventions. They are part of the Stage 0 
   import or graph-invocation behavior.
 - Agent unit tests must remain independent from network, cloud services,
   PostgreSQL, Docker, and LLM providers.
+- Agent data access must not expose arbitrary SQL execution.
+- Agent-facing BigQuery access must use SELECT-only application-owned query
+  templates with parameterized dynamic values.
+- Agent-facing BigQuery reads must perform dry-run cost validation before
+  execution and must set `maximum_bytes_billed` on the real query.
+- Agent-facing BigQuery reads must use Standard SQL, finite timeouts, bounded
+  result sizes, and sanitized public query errors.
+- Agent tools must read authoritative risk from MART and must not invoke the
+  deterministic risk engine to recalculate current risk.
+- Normal tests for agent data access must not require cloud credentials,
+  network access, BigQuery, PostgreSQL, Docker, or LLM providers.
 
 ## Security
 

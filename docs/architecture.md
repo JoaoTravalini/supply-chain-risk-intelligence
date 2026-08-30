@@ -193,6 +193,22 @@ LangGraph
 
 The guarded BigQuery tools are not implemented in Stage 13.
 
+Stage 14 defines the guarded read-only analytical data boundary for future
+investigation nodes:
+
+```text
+LangGraph
+-> future investigation nodes
+-> approved Agent Data Tools
+-> Guarded BigQuery Reader
+-> BigQuery CORE / MART
+```
+
+The Stage 14 boundary uses typed operation inputs, static application-owned
+SQL, BigQuery parameters, dry-run cost checks, `maximum_bytes_billed`, finite
+timeouts, and result bounds. It does not expose arbitrary SQL, RAW access, LLM
+integration, or investigation reasoning nodes.
+
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 
 ## BigQuery Conceptual Layers

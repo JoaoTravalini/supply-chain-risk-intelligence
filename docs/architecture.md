@@ -86,9 +86,12 @@ Stage 11 implements and deploys the local BigQuery RAW/CORE warehouse boundary,
 table/view definitions, RAW load-job handler, and Supplier snapshot loader.
 Stage 12 implements deterministic Supplier Risk Model v1, CORE risk input
 reading, MART current/history loaders, and deployed MART table definitions. One
-full 120-Supplier development assessment batch was loaded for validation. Worker
-runtime, DLQ consumption/replay, production scheduling, and production Pub/Sub
-IaC remain deferred.
+full 120-Supplier development assessment batch was loaded for validation. Stage
+13 implements a minimal real LangGraph investigation runtime with explicit
+investigation/thread identity, typed serializable state, an InvestigationService
+boundary, and PostgreSQL-backed checkpoint persistence. Guarded BigQuery agent
+tools, LLM integration, worker runtime, DLQ consumption/replay, production
+scheduling, and production Pub/Sub IaC remain deferred.
 
 Target flow:
 
@@ -170,6 +173,25 @@ CORE suppliers
 
 LangGraph will later read and explain MART outputs. It does not calculate the
 authoritative risk score.
+
+Stage 13 defines the local investigation persistence foundation:
+
+```text
+Streamlit application (future)
+-> InvestigationService
+-> LangGraph
+-> PostgreSQL checkpoint state
+```
+
+Future guarded analytical retrieval remains separate:
+
+```text
+LangGraph
+-> future guarded BigQuery tools
+-> BigQuery CORE / MART
+```
+
+The guarded BigQuery tools are not implemented in Stage 13.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 
@@ -255,7 +277,18 @@ Future state is expected to represent concepts including:
 - Validation outcome
 - Final answer
 
-Python state models are intentionally not implemented in Stage 0.
+Stage 13 implements the durable foundation with a smaller initial graph:
+
+```text
+START
+-> initialize_investigation
+-> prepare_investigation
+-> END
+```
+
+This foundation persists investigation state and proves thread isolation. It
+does not call an LLM, query BigQuery, fabricate evidence, or calculate supplier
+risk.
 
 The future design must support persistent checkpoints and interrupt/resume human-in-the-loop behavior.
 

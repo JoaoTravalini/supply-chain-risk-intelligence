@@ -8,6 +8,8 @@ dependencies = [
     "google-cloud-bigquery>=3,<4",
     "google-cloud-pubsub>=2,<3",
     "httpx>=0.28,<1",
+    "langgraph>=1.2.11",
+    "langgraph-checkpoint-postgres>=3.1.2",
     "pydantic>=2,<3",
 ]
 
@@ -49,6 +51,9 @@ python_classes = ["Test*"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 testpaths = ["tests"]
+markers = [
+    "integration: tests requiring explicit local services or external runtimes",
+]
 
 [tool.coverage.run]
 branch = true

@@ -120,10 +120,22 @@ These standards define future project conventions. They are part of the Stage 0 
   Event deduplication keys, not transport identifiers.
 - MART risk tables must contain assessment outputs and evidence identities, not
   raw provider payload dumps or Pub/Sub transport metadata.
+- LangGraph investigation state must remain serializable and must not contain
+  database clients, cloud clients, credentials, callbacks, or arbitrary Python
+  objects.
+- LangGraph thread identity must be explicit and separate from supplier,
+  message, event, and investigation identities.
+- Agent runtime code must not create database connections or compiled global
+  graphs at import time.
+- PostgreSQL checkpoint schema setup must be an explicit operation, not hidden
+  import or graph-invocation behavior.
+- Agent unit tests must remain independent from network, cloud services,
+  PostgreSQL, Docker, and LLM providers.
 
 ## Security
 
 - Do not hardcode secrets.
+- Do not commit PostgreSQL DSNs or passwords.
 - Do not commit service-account key files.
 - Use managed secrets in deployed environments.
 - Apply least-privilege IAM.

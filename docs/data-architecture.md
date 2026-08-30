@@ -82,6 +82,19 @@ CORE suppliers
 LangGraph will later read and explain MART risk outputs. It does not calculate
 authoritative risk scores.
 
+Stage 13 adds PostgreSQL-backed LangGraph checkpoint state for operational
+investigation workflow persistence:
+
+```text
+InvestigationService
+-> LangGraph
+-> PostgreSQL checkpoint state
+```
+
+This state is not BigQuery analytical data, does not replace RAW/CORE/MART, and
+does not replace the ProcessingLedger. Guarded BigQuery agent tools remain
+deferred.
+
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
 The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. Canonical Supplier master data now exists as a versioned synthetic JSONL artifact validated through the Supplier v1 contract. Stage 11 defines the physical CORE supplier table and batch snapshot loader, but the live load remains deferred until after human approval of the OpenTofu plan and apply checkpoint.

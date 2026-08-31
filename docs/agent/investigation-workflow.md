@@ -2,7 +2,8 @@
 
 Stage 15 connects the durable LangGraph runtime to guarded BigQuery reads and a
 Gemini model provider so Supplier risk investigations can produce structured,
-evidence-grounded reports.
+evidence-grounded reports. Stage 16 adds deterministic report validation and a
+native LangGraph human-review pause after a report is produced.
 
 Status: implementation complete, with live Gemini provider validation externally
 blocked. Offline validation is complete, and the full integration path reached
@@ -24,13 +25,18 @@ START
 -> load_evidence
 -> analyze_investigation
 -> finalize_investigation
+-> validate_report
+-> human_review
+-> finalize_review
 -> END
 ```
 
 `create_investigation` remains the Stage 13 compatibility path and creates a
 `READY` checkpoint. `run_investigation` executes the Stage 15 workflow and
 persists either `COMPLETED` with an `InvestigationReport` or `FAILED` with safe
-failure metadata.
+failure metadata. `COMPLETED` means the report was produced; the separate
+human-review lifecycle records whether review is `PENDING`, `APPROVED`, or
+`REJECTED`.
 
 ## Authoritative Data Sources
 
@@ -107,8 +113,24 @@ come from the authoritative current MART assessment. The workflow retrieves
 those keys through `AgentDataService.get_risk_evidence`.
 
 Every evidence key cited by Gemini is validated against the evidence actually
-retrieved for the investigation. Unknown evidence keys fail the investigation
-with safe `FAILED` metadata rather than being silently accepted.
+retrieved for the investigation before human review is reached. Unknown evidence
+keys fail the investigation with safe `FAILED` metadata rather than being
+silently accepted.
+
+## Deterministic Validation and Review
+
+Before human review, application code validates identity consistency, exact
+MART-owned risk-field immutability, evidence allowlisting, and required report
+sections. The validation gate is deterministic and does not call an LLM.
+
+When validation passes, LangGraph persists `PENDING` human review state and
+pauses with a native interrupt. The service resumes the graph through typed
+approve/reject review submissions. Human review records who reviewed, when they
+reviewed, the decision, reason where applicable, and review ID. Rejection
+requires a reason and does not trigger automatic regeneration.
+
+Human review cannot modify Supplier identity, evidence source records,
+authoritative risk values, factor scores, model version, or report contents.
 
 ## Zero-Evidence Behavior
 

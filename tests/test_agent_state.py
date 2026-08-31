@@ -114,6 +114,9 @@ def test_state_serialization_is_json_compatible_and_safe() -> None:
         "provider_failure_category": None,
         "provider_exception_class": None,
         "provider_status_code": None,
+        "validation_result": None,
+        "human_review_status": "NOT_REQUESTED",
+        "human_review": None,
     }
     assert restored == snapshot
     assert "client" not in state

@@ -10,6 +10,7 @@ from uuid import UUID
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command, interrupt
 from pydantic import BaseModel, ValidationError
 
 from supplychain.agent.context import (
@@ -26,16 +27,20 @@ from supplychain.agent.data import (
 from supplychain.agent.errors import AgentError, InvestigationModelError
 from supplychain.agent.llm import InvestigationModel
 from supplychain.agent.models import (
+    HumanReviewInterruptPayload,
+    HumanReviewRecord,
+    HumanReviewStatus,
     InvestigationState,
     InvestigationStatus,
+    SubmitHumanReviewRequest,
     snapshot_from_state,
 )
 from supplychain.agent.prompts import INVESTIGATION_PROMPT_VERSION
 from supplychain.agent.reports import (
     InvestigationAnalysis,
     InvestigationReport,
-    validate_analysis_evidence_references,
 )
+from supplychain.agent.validation import InvestigationReportValidator
 from supplychain.contracts import CanonicalEvent
 from supplychain.domain import Supplier
 from supplychain.risk import SupplierRiskAssessment
@@ -49,7 +54,7 @@ class CompiledInvestigationGraph(Protocol):
 
     def invoke(
         self,
-        input: InvestigationState,
+        input: InvestigationState | Command[Any],
         config: MutableMapping[str, Any],
     ) -> dict[str, Any]:
         """Run the graph for one investigation thread."""
@@ -105,13 +110,19 @@ def build_investigation_graph(
             ),
         )
         graph.add_node("finalize_investigation", finalize_investigation)
+        graph.add_node("validate_report", validate_report)
+        graph.add_node("human_review", human_review)
+        graph.add_node("finalize_review", finalize_review)
         graph.add_edge("initialize_investigation", "load_supplier_context")
         graph.add_edge("load_supplier_context", "load_risk_context")
         graph.add_edge("load_risk_context", "load_risk_history")
         graph.add_edge("load_risk_history", "load_evidence")
         graph.add_edge("load_evidence", "analyze_investigation")
         graph.add_edge("analyze_investigation", "finalize_investigation")
-        graph.add_edge("finalize_investigation", END)
+        graph.add_edge("finalize_investigation", "validate_report")
+        graph.add_edge("validate_report", "human_review")
+        graph.add_edge("human_review", "finalize_review")
+        graph.add_edge("finalize_review", END)
     return cast(CompiledInvestigationGraph, graph.compile(checkpointer=checkpointer))
 
 
@@ -139,6 +150,9 @@ def initialize_investigation(state: InvestigationState) -> InvestigationState:
         "provider_failure_category": None,
         "provider_exception_class": None,
         "provider_status_code": None,
+        "validation_result": None,
+        "human_review_status": HumanReviewStatus.NOT_REQUESTED.value,
+        "human_review": None,
     }
 
 
@@ -161,6 +175,12 @@ def prepare_investigation(state: InvestigationState) -> InvestigationState:
         "provider_failure_category": None,
         "provider_exception_class": None,
         "provider_status_code": None,
+        "validation_result": state.get("validation_result"),
+        "human_review_status": state.get(
+            "human_review_status",
+            HumanReviewStatus.NOT_REQUESTED.value,
+        ),
+        "human_review": state.get("human_review"),
     }
 
 
@@ -278,7 +298,6 @@ def analyze_investigation(
         )
         analysis = model.analyze(context)
         allowed_keys = {event.metadata.deduplication_key for event in evidence}
-        validate_analysis_evidence_references(analysis, allowed_evidence_keys=allowed_keys)
         report = _report_from_analysis(
             state=state,
             risk=current_risk,
@@ -324,6 +343,117 @@ def finalize_investigation(state: InvestigationState) -> InvestigationState:
         "error_code": None,
         "error_message": None,
     }
+
+
+def validate_report(state: InvestigationState) -> InvestigationState:
+    """Validate the produced report before requesting human review."""
+
+    if _is_failed(state):
+        return state
+    try:
+        snapshot = snapshot_from_state(state)
+        if snapshot.report is None:
+            return _failed_state(
+                state,
+                code="MissingReport",
+                message="Investigation report was not produced",
+            )
+        current_risk = _state_model(SupplierRiskAssessment, state.get("current_risk"))
+        evidence = tuple(_state_model(CanonicalEvent, item) for item in state.get("evidence", []))
+        validation = InvestigationReportValidator().validate(
+            report=snapshot.report,
+            current_risk=current_risk,
+            evidence=evidence,
+            supplier_id=snapshot.supplier_id,
+            investigation_id=snapshot.investigation_id,
+            thread_id=snapshot.thread_id,
+            expected_thread_id=snapshot.thread_id,
+        )
+    except (ValidationError, ValueError, KeyError, TypeError) as exc:
+        return _failed_state(
+            state,
+            code=type(exc).__name__,
+            message="Investigation report validation failed",
+        )
+    if not validation.passed:
+        return {
+            **_failed_state(
+                state,
+                code="InvestigationReportValidationError",
+                message="Investigation report validation failed",
+            ),
+            "validation_result": validation.model_dump(mode="json"),
+            "human_review_status": HumanReviewStatus.NOT_REQUESTED.value,
+            "human_review": None,
+        }
+    pending_review = HumanReviewRecord(status=HumanReviewStatus.PENDING)
+    return {
+        **state,
+        "validation_result": validation.model_dump(mode="json"),
+        "human_review_status": HumanReviewStatus.PENDING.value,
+        "human_review": pending_review.model_dump(mode="json"),
+    }
+
+
+def human_review(state: InvestigationState) -> InvestigationState:
+    """Pause the graph for native LangGraph human review."""
+
+    if _is_failed(state) or state.get("human_review_status") != HumanReviewStatus.PENDING.value:
+        return state
+    try:
+        snapshot = snapshot_from_state(state)
+        if snapshot.report is None or snapshot.validation_result is None:
+            return _failed_state(
+                state,
+                code="MissingReviewContext",
+                message="Investigation review context was not produced",
+            )
+        payload = HumanReviewInterruptPayload(
+            investigation_id=snapshot.investigation_id,
+            thread_id=snapshot.thread_id,
+            supplier_id=snapshot.supplier_id,
+            risk_score=snapshot.report.risk_score,
+            risk_level=snapshot.report.risk_level,
+            executive_summary=snapshot.report.executive_summary,
+            recommendations=snapshot.report.recommendations,
+            evidence_keys=snapshot.report.evidence_deduplication_keys_used,
+            validation_passed=snapshot.validation_result.passed,
+        )
+        review_request = SubmitHumanReviewRequest.model_validate_json(
+            json.dumps(interrupt(payload.model_dump(mode="json")), sort_keys=True)
+        )
+        if (
+            review_request.investigation_id != snapshot.investigation_id
+            or review_request.thread_id != snapshot.thread_id
+        ):
+            return _failed_state(
+                state,
+                code="HumanReviewIdentityMismatch",
+                message="Human review identity did not match investigation state",
+            )
+        review = review_request.to_record()
+    except (ValidationError, ValueError, KeyError, TypeError) as exc:
+        return _failed_state(
+            state,
+            code=type(exc).__name__,
+            message="Human review submission failed validation",
+        )
+    return {
+        **state,
+        "human_review_status": review.status.value,
+        "human_review": review.model_dump(mode="json"),
+        "error_code": None,
+        "error_message": None,
+    }
+
+
+def finalize_review(state: InvestigationState) -> InvestigationState:
+    """Finalize post-review graph execution without mutating the report."""
+
+    if _is_failed(state):
+        return state
+    snapshot_from_state(state)
+    return state
 
 
 def _report_from_analysis(

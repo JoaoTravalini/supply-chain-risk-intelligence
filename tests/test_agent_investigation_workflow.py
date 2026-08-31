@@ -15,12 +15,17 @@ from supplychain.agent import (
     EvidenceFinding,
     GeminiInvestigationModel,
     GeminiInvestigationModelConfig,
+    HumanReviewDecision,
+    HumanReviewStatus,
+    HumanReviewTransitionError,
     InvestigationAnalysis,
     InvestigationContextError,
     InvestigationModelError,
     InvestigationOutputValidationError,
     InvestigationService,
     InvestigationStatus,
+    SubmitHumanReviewRequest,
+    ValidationFailureCode,
 )
 from supplychain.agent.context import (
     InvestigationContext,
@@ -53,6 +58,7 @@ from supplychain.agent.prompts import (
     INVESTIGATION_SYSTEM_INSTRUCTION,
 )
 from supplychain.agent.reports import validate_analysis_evidence_references
+from supplychain.agent.validation import InvestigationReportValidator
 from supplychain.contracts import (
     CanonicalEvent,
     EntityReference,
@@ -391,7 +397,11 @@ def test_full_workflow_generates_completed_persisted_report() -> None:
     assert len(model.contexts) == 1
     assert model.contexts[0].evidence[0].evidence_key == EVIDENCE_KEY
     assert result.status is InvestigationStatus.COMPLETED
+    assert result.human_review_status is HumanReviewStatus.PENDING
+    assert result.validation_result is not None
+    assert result.validation_result.passed is True
     assert persisted.report is not None
+    assert persisted.human_review_status is HumanReviewStatus.PENDING
     assert persisted.report == result.report
     assert persisted.report.risk_score == 41.83
 
@@ -406,6 +416,7 @@ def test_zero_evidence_workflow_succeeds_without_fake_citations() -> None:
     result = service(data_service, model).run_investigation(request())
 
     assert result.status is InvestigationStatus.COMPLETED
+    assert result.human_review_status is HumanReviewStatus.PENDING
     assert result.report is not None
     assert result.report.evidence_findings == ()
     assert model.contexts[0].zero_evidence is True
@@ -439,7 +450,6 @@ def test_retrieval_failures_persist_failed_state_and_skip_gemini(failure: Except
     [
         InvestigationModelError("provider failed"),
         InvestigationOutputValidationError("bad json"),
-        analysis_fixture(evidence_keys=(UNKNOWN_EVIDENCE_KEY,)),
     ],
 )
 def test_model_failures_persist_failed_state_without_fake_report(
@@ -453,6 +463,21 @@ def test_model_failures_persist_failed_state_without_fake_report(
     assert result.status is InvestigationStatus.FAILED
     assert result.report is None
     assert result.error_message == "Investigation analysis failed"
+
+
+def test_unknown_evidence_fails_validation_before_human_review() -> None:
+    data_service = FakeAgentDataService(evidence=(event_fixture(),))
+    model = FakeModel(analysis_fixture(evidence_keys=(UNKNOWN_EVIDENCE_KEY,)))
+
+    result = service(data_service, model).run_investigation(request())
+
+    assert result.status is InvestigationStatus.FAILED
+    assert result.report is None
+    assert result.error_message == "Investigation report validation failed"
+    assert result.validation_result is not None
+    assert result.validation_result.passed is False
+    assert result.validation_result.failure_codes == (ValidationFailureCode.UNKNOWN_EVIDENCE,)
+    assert result.human_review_status is HumanReviewStatus.NOT_REQUESTED
 
 
 def test_authoritative_risk_values_cannot_be_overwritten_by_model_text() -> None:
@@ -470,6 +495,7 @@ def test_authoritative_risk_values_cannot_be_overwritten_by_model_text() -> None
     result = service(data_service, model).run_investigation(request())
 
     assert result.report is not None
+    assert result.human_review_status is HumanReviewStatus.PENDING
     assert result.report.risk_score == 73.21
     assert result.report.risk_level is RiskLevel.MEDIUM
     assert result.report.risk_model_version == "1.0.0"
@@ -490,6 +516,7 @@ def test_completed_report_survives_service_reconstruction_with_same_checkpointer
     resumed = second_service.get_investigation_state(str(first.thread_id))
 
     assert resumed.status is InvestigationStatus.COMPLETED
+    assert resumed.human_review_status is HumanReviewStatus.PENDING
     assert resumed.supplier_id == "SUP-000001"
     assert resumed.report is not None
     assert resumed.report.risk_score == first.report.risk_score
@@ -514,6 +541,138 @@ def test_stage_13_checkpoint_shape_remains_readable() -> None:
 
     assert snapshot.status is InvestigationStatus.READY
     assert snapshot.report is None
+    assert snapshot.human_review_status is HumanReviewStatus.NOT_REQUESTED
+
+
+def test_submit_review_approve_resumes_native_interrupt() -> None:
+    investigation_service = service(
+        FakeAgentDataService(evidence=(event_fixture(),)),
+        FakeModel(),
+    )
+    pending = investigation_service.run_investigation(request())
+
+    reviewed = investigation_service.submit_review(
+        SubmitHumanReviewRequest(
+            investigation_id=pending.investigation_id,
+            thread_id=pending.thread_id,
+            decision=HumanReviewDecision.APPROVE,
+            reviewer_id="reviewer-001",
+            reviewed_at=NOW,
+        )
+    )
+
+    assert reviewed.status is InvestigationStatus.COMPLETED
+    assert reviewed.human_review_status is HumanReviewStatus.APPROVED
+    assert reviewed.human_review is not None
+    assert reviewed.human_review.reviewer_id == "reviewer-001"
+    assert reviewed.human_review.reviewed_at == NOW
+    assert reviewed.report == pending.report
+
+
+def test_submit_review_reject_requires_reason_and_preserves_report() -> None:
+    investigation_service = service(
+        FakeAgentDataService(evidence=(event_fixture(),)),
+        FakeModel(),
+    )
+    pending = investigation_service.run_investigation(request())
+
+    with pytest.raises(ValidationError):
+        SubmitHumanReviewRequest(
+            investigation_id=pending.investigation_id,
+            thread_id=pending.thread_id,
+            decision=HumanReviewDecision.REJECT,
+            reviewer_id="reviewer-001",
+            reviewed_at=NOW,
+        )
+
+    rejected = investigation_service.submit_review(
+        SubmitHumanReviewRequest(
+            investigation_id=pending.investigation_id,
+            thread_id=pending.thread_id,
+            decision=HumanReviewDecision.REJECT,
+            reviewer_id="reviewer-001",
+            reviewed_at=NOW,
+            reason="Recommendation needs operations review before action.",
+        )
+    )
+
+    assert rejected.status is InvestigationStatus.COMPLETED
+    assert rejected.human_review_status is HumanReviewStatus.REJECTED
+    assert rejected.human_review is not None
+    assert rejected.human_review.reason == "Recommendation needs operations review before action."
+    assert rejected.report == pending.report
+
+
+def test_review_submission_is_idempotent_for_duplicate_and_rejects_conflict() -> None:
+    investigation_service = service(
+        FakeAgentDataService(evidence=(event_fixture(),)),
+        FakeModel(),
+    )
+    pending = investigation_service.run_investigation(request())
+    review = SubmitHumanReviewRequest(
+        investigation_id=pending.investigation_id,
+        thread_id=pending.thread_id,
+        decision=HumanReviewDecision.APPROVE,
+        reviewer_id="reviewer-001",
+        reviewed_at=NOW,
+    )
+
+    approved = investigation_service.submit_review(review)
+    duplicate = investigation_service.submit_review(review)
+
+    assert duplicate == approved
+    assert duplicate.human_review_status is HumanReviewStatus.APPROVED
+
+    with pytest.raises(HumanReviewTransitionError):
+        investigation_service.submit_review(
+            SubmitHumanReviewRequest(
+                investigation_id=pending.investigation_id,
+                thread_id=pending.thread_id,
+                decision=HumanReviewDecision.REJECT,
+                reviewer_id="reviewer-001",
+                reviewed_at=NOW,
+                reason="Conflicting second decision.",
+            )
+        )
+
+
+def test_review_against_wrong_investigation_is_rejected() -> None:
+    investigation_service = service(
+        FakeAgentDataService(evidence=(event_fixture(),)),
+        FakeModel(),
+    )
+    pending = investigation_service.run_investigation(request())
+
+    with pytest.raises(HumanReviewTransitionError):
+        investigation_service.submit_review(
+            SubmitHumanReviewRequest(
+                investigation_id=UUID("33333333-3333-4333-8333-333333333333"),
+                thread_id=pending.thread_id,
+                decision=HumanReviewDecision.APPROVE,
+                reviewer_id="reviewer-001",
+                reviewed_at=NOW,
+            )
+        )
+
+
+def test_validation_gate_detects_authoritative_risk_tampering() -> None:
+    data_service = FakeAgentDataService(evidence=(event_fixture(),))
+    pending = service(data_service, FakeModel()).run_investigation(request())
+    assert pending.report is not None
+    tampered_report = pending.report.model_copy(update={"risk_score": 1.0})
+
+    validation = InvestigationReportValidator().validate(
+        report=tampered_report,
+        current_risk=risk_fixture(),
+        evidence=(event_fixture(),),
+        supplier_id="SUP-000001",
+        investigation_id=pending.investigation_id,
+        thread_id=pending.thread_id,
+        expected_thread_id=pending.thread_id,
+    )
+
+    assert validation.passed is False
+    assert validation.failure_codes == (ValidationFailureCode.RISK_MISMATCH,)
 
 
 def test_gemini_config_rejects_blank_api_key_without_leaking_value() -> None:

@@ -22,6 +22,10 @@ class InvestigationNotFoundError(AgentError):
     """Raised when no persisted investigation state exists for a thread."""
 
 
+class HumanReviewTransitionError(AgentError):
+    """Raised when a human review decision is invalid for the current state."""
+
+
 class ProviderFailureCategory(StrEnum):
     """Safe bounded model-provider failure categories."""
 

@@ -6,6 +6,7 @@ from collections.abc import Callable, MutableMapping
 from datetime import datetime
 from typing import Any
 
+from langgraph.types import Command
 from pydantic import ValidationError
 
 from supplychain.agent.context import InvestigationContextLimits
@@ -13,6 +14,7 @@ from supplychain.agent.data import AgentDataService
 from supplychain.agent.errors import (
     AgentConfigurationError,
     AgentPersistenceError,
+    HumanReviewTransitionError,
     InvestigationNotFoundError,
 )
 from supplychain.agent.graph import (
@@ -23,9 +25,12 @@ from supplychain.agent.graph import (
 from supplychain.agent.llm import InvestigationModel
 from supplychain.agent.models import (
     CreateInvestigationRequest,
+    HumanReviewDecision,
+    HumanReviewStatus,
     InvestigationIdentity,
     InvestigationSnapshot,
     InvestigationStatus,
+    SubmitHumanReviewRequest,
     require_aware_utc,
     snapshot_from_state,
     snapshot_to_state,
@@ -129,6 +134,38 @@ class InvestigationService:
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise AgentPersistenceError("Persisted investigation state is invalid") from exc
 
+    def submit_review(self, request: SubmitHumanReviewRequest) -> InvestigationSnapshot:
+        """Submit a human review decision and resume the pending graph interrupt."""
+
+        if self._investigation_graph is None:
+            raise AgentConfigurationError("Investigation workflow dependencies are not configured")
+        current = self.get_investigation_state(str(request.thread_id))
+        if current.investigation_id != request.investigation_id:
+            raise HumanReviewTransitionError("Human review investigation identity did not match")
+        if current.thread_id != request.thread_id:
+            raise HumanReviewTransitionError("Human review thread identity did not match")
+        if current.human_review_status in {
+            HumanReviewStatus.APPROVED,
+            HumanReviewStatus.REJECTED,
+        }:
+            if _is_duplicate_review_submission(current, request):
+                return current
+            raise HumanReviewTransitionError("Human review has already been finalized")
+        if (
+            current.status is not InvestigationStatus.COMPLETED
+            or current.report is None
+            or current.human_review_status is not HumanReviewStatus.PENDING
+        ):
+            raise HumanReviewTransitionError("No human review is pending for this investigation")
+        try:
+            result = self._investigation_graph.invoke(
+                Command(resume=request.model_dump(mode="json")),
+                thread_config(str(request.thread_id)),
+            )
+        except Exception as exc:
+            raise AgentPersistenceError("Unable to submit human review") from exc
+        return snapshot_from_state(result)
+
     def _initial_snapshot(self, request: CreateInvestigationRequest) -> InvestigationSnapshot:
         identity_data: dict[str, object] = {}
         if request.investigation_id is not None:
@@ -154,6 +191,24 @@ def thread_config(thread_id: str) -> MutableMapping[str, Any]:
     """Build the official LangGraph checkpoint thread configuration."""
 
     return {"configurable": {"thread_id": thread_id}}
+
+
+def _is_duplicate_review_submission(
+    current: InvestigationSnapshot,
+    request: SubmitHumanReviewRequest,
+) -> bool:
+    if current.human_review is None:
+        return False
+    expected_status = (
+        HumanReviewStatus.APPROVED
+        if request.decision is HumanReviewDecision.APPROVE
+        else HumanReviewStatus.REJECTED
+    )
+    return (
+        current.human_review.status is expected_status
+        and current.human_review.reviewer_id == request.reviewer_id
+        and current.human_review.reason == request.reason
+    )
 
 
 def main() -> None:

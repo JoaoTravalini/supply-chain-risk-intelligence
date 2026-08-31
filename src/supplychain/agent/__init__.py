@@ -32,6 +32,7 @@ if TYPE_CHECKING:
         AgentConfigurationError,
         AgentError,
         AgentPersistenceError,
+        HumanReviewTransitionError,
         InvestigationContextError,
         InvestigationModelConfigurationError,
         InvestigationModelError,
@@ -56,10 +57,18 @@ if TYPE_CHECKING:
     )
     from supplychain.agent.models import (
         CreateInvestigationRequest,
+        HumanReviewDecision,
+        HumanReviewInterruptPayload,
+        HumanReviewRecord,
+        HumanReviewStatus,
         InvestigationIdentity,
         InvestigationSnapshot,
         InvestigationState,
         InvestigationStatus,
+        InvestigationValidationResult,
+        SubmitHumanReviewRequest,
+        ValidationCheck,
+        ValidationFailureCode,
     )
     from supplychain.agent.persistence import AGENT_POSTGRES_DSN_ENV
     from supplychain.agent.reports import (
@@ -68,6 +77,7 @@ if TYPE_CHECKING:
         InvestigationReport,
     )
     from supplychain.agent.service import InvestigationService, thread_config
+    from supplychain.agent.validation import InvestigationReportValidator
 
 __all__ = [
     "AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV",
@@ -98,6 +108,11 @@ __all__ = [
     "GeminiInvestigationModel",
     "GeminiInvestigationModelConfig",
     "GuardedBigQueryReader",
+    "HumanReviewDecision",
+    "HumanReviewInterruptPayload",
+    "HumanReviewRecord",
+    "HumanReviewStatus",
+    "HumanReviewTransitionError",
     "InvestigationAnalysis",
     "InvestigationContextError",
     "InvestigationIdentity",
@@ -107,16 +122,21 @@ __all__ = [
     "InvestigationNotFoundError",
     "InvestigationOutputValidationError",
     "InvestigationReport",
+    "InvestigationReportValidator",
     "InvestigationService",
     "InvestigationSnapshot",
     "InvestigationState",
     "InvestigationStatus",
+    "InvestigationValidationResult",
     "ProviderFailureCategory",
     "ProviderFailureDiagnostic",
     "QueryBudgetExceededError",
     "RiskEvidenceInput",
     "RiskHistoryInput",
+    "SubmitHumanReviewRequest",
     "SupplierLookupInput",
+    "ValidationCheck",
+    "ValidationFailureCode",
     "agent_bigquery_config_from_env",
     "agent_data_service_from_env",
     "approved_agent_data_tools",
@@ -160,6 +180,7 @@ def __getattr__(name: str) -> Any:
         "AgentConfigurationError",
         "AgentError",
         "AgentPersistenceError",
+        "HumanReviewTransitionError",
         "InvestigationContextError",
         "InvestigationModelConfigurationError",
         "InvestigationModelError",
@@ -193,10 +214,18 @@ def __getattr__(name: str) -> Any:
         return getattr(llm, name)
     if name in {
         "CreateInvestigationRequest",
+        "HumanReviewDecision",
+        "HumanReviewInterruptPayload",
+        "HumanReviewRecord",
+        "HumanReviewStatus",
         "InvestigationIdentity",
         "InvestigationSnapshot",
         "InvestigationState",
         "InvestigationStatus",
+        "InvestigationValidationResult",
+        "SubmitHumanReviewRequest",
+        "ValidationCheck",
+        "ValidationFailureCode",
     }:
         from supplychain.agent import models
 
@@ -209,6 +238,10 @@ def __getattr__(name: str) -> Any:
         from supplychain.agent import reports
 
         return getattr(reports, name)
+    if name == "InvestigationReportValidator":
+        from supplychain.agent.validation import InvestigationReportValidator
+
+        return InvestigationReportValidator
     if name in {"InvestigationService", "thread_config"}:
         from supplychain.agent import service
 

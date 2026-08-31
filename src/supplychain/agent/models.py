@@ -9,17 +9,28 @@ from enum import StrEnum
 from typing import Annotated, NotRequired, TypedDict
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from supplychain.agent.errors import ProviderFailureCategory
 from supplychain.agent.reports import InvestigationReport
-from supplychain.risk.models import EvidenceKey, SupplierId
+from supplychain.risk.models import EvidenceKey, RiskLevel, RiskScore, SupplierId
 
 Question = Annotated[
     str,
     StringConstraints(min_length=1, max_length=2_000, strip_whitespace=True, strict=True),
 ]
 SafeIdentifier = Annotated[str, StringConstraints(min_length=1, strip_whitespace=True, strict=True)]
+ReviewComment = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=2_000, strip_whitespace=True, strict=True),
+]
 
 
 class InvestigationStatus(StrEnum):
@@ -29,6 +40,33 @@ class InvestigationStatus(StrEnum):
     READY = "READY"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+
+
+class HumanReviewStatus(StrEnum):
+    """Separate human review lifecycle for produced investigation reports."""
+
+    NOT_REQUESTED = "NOT_REQUESTED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+
+class HumanReviewDecision(StrEnum):
+    """Human decisions supported by Stage 16."""
+
+    APPROVE = "APPROVE"
+    REJECT = "REJECT"
+
+
+class ValidationFailureCode(StrEnum):
+    """Bounded deterministic report-validation failure codes."""
+
+    SUPPLIER_MISMATCH = "SUPPLIER_MISMATCH"
+    INVESTIGATION_MISMATCH = "INVESTIGATION_MISMATCH"
+    THREAD_MISMATCH = "THREAD_MISMATCH"
+    RISK_MISMATCH = "RISK_MISMATCH"
+    UNKNOWN_EVIDENCE = "UNKNOWN_EVIDENCE"
+    INVALID_REPORT = "INVALID_REPORT"
 
 
 class StrictAgentModel(BaseModel):
@@ -61,6 +99,121 @@ class CreateInvestigationRequest(StrictAgentModel):
         return require_aware_utc(value)
 
 
+class ValidationCheck(StrictAgentModel):
+    """One deterministic validation check outcome."""
+
+    name: SafeIdentifier
+    passed: bool
+    failure_code: ValidationFailureCode | None = None
+
+    @model_validator(mode="after")
+    def require_failure_code_when_failed(self) -> ValidationCheck:
+        if not self.passed and self.failure_code is None:
+            raise ValueError("failed validation checks require a failure code")
+        if self.passed and self.failure_code is not None:
+            raise ValueError("passed validation checks must not include a failure code")
+        return self
+
+
+class InvestigationValidationResult(StrictAgentModel):
+    """Deterministic validation result persisted with the investigation state."""
+
+    passed: bool
+    checks: tuple[ValidationCheck, ...]
+    failure_codes: tuple[ValidationFailureCode, ...] = ()
+
+    @model_validator(mode="after")
+    def require_consistent_failure_codes(self) -> InvestigationValidationResult:
+        expected = tuple(check.failure_code for check in self.checks if check.failure_code)
+        if self.failure_codes != expected:
+            raise ValueError("validation failure codes must match failed checks")
+        if self.passed != (not expected):
+            raise ValueError("validation pass flag must match failed checks")
+        return self
+
+
+class HumanReviewRecord(StrictAgentModel):
+    """Persisted human review audit record."""
+
+    review_id: UUID = Field(default_factory=uuid4)
+    status: HumanReviewStatus
+    reviewer_id: SafeIdentifier | None = None
+    reviewed_at: datetime | None = None
+    reason: ReviewComment | None = None
+
+    @field_validator("reviewed_at")
+    @classmethod
+    def require_aware_reviewed_at(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        return require_aware_utc(value)
+
+    @model_validator(mode="after")
+    def require_final_review_metadata(self) -> HumanReviewRecord:
+        if self.status in {
+            HumanReviewStatus.APPROVED,
+            HumanReviewStatus.REJECTED,
+        } and (self.reviewer_id is None or self.reviewed_at is None):
+            raise ValueError("final human reviews require reviewer_id and reviewed_at")
+        if self.status is HumanReviewStatus.REJECTED and self.reason is None:
+            raise ValueError("rejected human reviews require a reason")
+        if self.status in {HumanReviewStatus.NOT_REQUESTED, HumanReviewStatus.PENDING} and (
+            self.reviewer_id is not None or self.reviewed_at is not None or self.reason is not None
+        ):
+            raise ValueError("non-final human reviews must not include reviewer metadata")
+        return self
+
+
+class SubmitHumanReviewRequest(StrictAgentModel):
+    """Public input for resuming a pending human-review interrupt."""
+
+    investigation_id: UUID
+    thread_id: UUID
+    decision: HumanReviewDecision
+    reviewer_id: SafeIdentifier
+    reviewed_at: datetime
+    reason: ReviewComment | None = None
+
+    @field_validator("reviewed_at")
+    @classmethod
+    def require_aware_reviewed_at(cls, value: datetime) -> datetime:
+        return require_aware_utc(value)
+
+    @model_validator(mode="after")
+    def require_rejection_reason(self) -> SubmitHumanReviewRequest:
+        if self.decision is HumanReviewDecision.REJECT and self.reason is None:
+            raise ValueError("rejected human reviews require a reason")
+        return self
+
+    def to_record(self) -> HumanReviewRecord:
+        """Convert a validated submission into a final review record."""
+
+        return HumanReviewRecord(
+            status=(
+                HumanReviewStatus.APPROVED
+                if self.decision is HumanReviewDecision.APPROVE
+                else HumanReviewStatus.REJECTED
+            ),
+            reviewer_id=self.reviewer_id,
+            reviewed_at=self.reviewed_at,
+            reason=self.reason,
+        )
+
+
+class HumanReviewInterruptPayload(StrictAgentModel):
+    """Sanitized payload surfaced by the LangGraph interrupt."""
+
+    investigation_id: UUID
+    thread_id: UUID
+    supplier_id: SupplierId
+    risk_score: RiskScore
+    risk_level: RiskLevel
+    executive_summary: str
+    recommendations: tuple[str, ...]
+    evidence_keys: tuple[EvidenceKey, ...]
+    validation_passed: bool
+
+
 class InvestigationSnapshot(StrictAgentModel):
     """Persisted public investigation state returned by the service boundary."""
 
@@ -82,6 +235,9 @@ class InvestigationSnapshot(StrictAgentModel):
     provider_failure_category: ProviderFailureCategory | None = None
     provider_exception_class: str | None = None
     provider_status_code: str | None = None
+    validation_result: InvestigationValidationResult | None = None
+    human_review_status: HumanReviewStatus = HumanReviewStatus.NOT_REQUESTED
+    human_review: HumanReviewRecord | None = None
 
     @field_validator("created_at", "updated_at")
     @classmethod
@@ -110,6 +266,9 @@ class InvestigationState(TypedDict):
     provider_failure_category: NotRequired[str | None]
     provider_exception_class: NotRequired[str | None]
     provider_status_code: NotRequired[str | None]
+    validation_result: NotRequired[dict[str, object] | None]
+    human_review_status: NotRequired[str]
+    human_review: NotRequired[dict[str, object] | None]
 
 
 def require_aware_utc(value: datetime) -> datetime:
@@ -164,6 +323,15 @@ def snapshot_to_state(snapshot: InvestigationSnapshot) -> InvestigationState:
         ),
         "provider_exception_class": snapshot.provider_exception_class,
         "provider_status_code": snapshot.provider_status_code,
+        "validation_result": (
+            None
+            if snapshot.validation_result is None
+            else snapshot.validation_result.model_dump(mode="json")
+        ),
+        "human_review_status": snapshot.human_review_status.value,
+        "human_review": (
+            None if snapshot.human_review is None else snapshot.human_review.model_dump(mode="json")
+        ),
     }
 
 
@@ -174,6 +342,8 @@ def snapshot_from_state(state: InvestigationState | dict[str, object]) -> Invest
     if not isinstance(evidence_keys, Iterable) or isinstance(evidence_keys, str):
         raise ValueError("evidence_keys must be an iterable of strings")
     report_value = state.get("report")
+    validation_result_value = state.get("validation_result")
+    human_review_value = state.get("human_review")
     return InvestigationSnapshot(
         investigation_id=UUID(str(state["investigation_id"])),
         thread_id=UUID(str(state["thread_id"])),
@@ -210,6 +380,23 @@ def snapshot_from_state(state: InvestigationState | dict[str, object]) -> Invest
             None
             if state.get("provider_status_code") is None
             else str(state.get("provider_status_code"))
+        ),
+        validation_result=(
+            None
+            if validation_result_value is None
+            else InvestigationValidationResult.model_validate_json(
+                json.dumps(validation_result_value, sort_keys=True)
+            )
+        ),
+        human_review_status=HumanReviewStatus(
+            str(state.get("human_review_status", HumanReviewStatus.NOT_REQUESTED.value))
+        ),
+        human_review=(
+            None
+            if human_review_value is None
+            else HumanReviewRecord.model_validate_json(
+                json.dumps(human_review_value, sort_keys=True)
+            )
         ),
     )
 

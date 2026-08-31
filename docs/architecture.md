@@ -89,9 +89,13 @@ reading, MART current/history loaders, and deployed MART table definitions. One
 full 120-Supplier development assessment batch was loaded for validation. Stage
 13 implements a minimal real LangGraph investigation runtime with explicit
 investigation/thread identity, typed serializable state, an InvestigationService
-boundary, and PostgreSQL-backed checkpoint persistence. Guarded BigQuery agent
-tools, LLM integration, worker runtime, DLQ consumption/replay, production
-scheduling, and production Pub/Sub IaC remain deferred.
+boundary, and PostgreSQL-backed checkpoint persistence. Stage 14 implements
+guarded BigQuery agent data access with static parameterized read-only SQL,
+dry-run cost checks, and result bounds. Stage 15 connects the durable LangGraph
+workflow to guarded CORE/MART retrieval and Gemini structured analysis while
+preserving MART as the authoritative source of current risk. HITL, Streamlit,
+worker runtime, DLQ consumption/replay, production scheduling, and production
+Pub/Sub IaC remain deferred.
 
 Target flow:
 
@@ -171,7 +175,7 @@ CORE suppliers
 -> MART supplier_risk_current
 ```
 
-LangGraph will later read and explain MART outputs. It does not calculate the
+LangGraph reads and explains MART outputs. It does not calculate the
 authoritative risk score.
 
 Stage 13 defines the local investigation persistence foundation:
@@ -183,11 +187,11 @@ Streamlit application (future)
 -> PostgreSQL checkpoint state
 ```
 
-Future guarded analytical retrieval remains separate:
+Stage 14 guarded analytical retrieval remains separate:
 
 ```text
 LangGraph
--> future guarded BigQuery tools
+-> approved Agent Data Tools
 -> BigQuery CORE / MART
 ```
 
@@ -204,10 +208,26 @@ LangGraph
 -> BigQuery CORE / MART
 ```
 
-The Stage 14 boundary uses typed operation inputs, static application-owned
-SQL, BigQuery parameters, dry-run cost checks, `maximum_bytes_billed`, finite
-timeouts, and result bounds. It does not expose arbitrary SQL, RAW access, LLM
-integration, or investigation reasoning nodes.
+The Stage 14 boundary uses typed operation inputs, static application-owned SQL,
+BigQuery parameters, dry-run cost checks, `maximum_bytes_billed`, finite
+timeouts, and result bounds. It does not expose arbitrary SQL or RAW access.
+
+Stage 15 defines the implemented evidence-grounded investigation path:
+
+```text
+InvestigationService
+-> LangGraph investigation workflow
+-> AgentDataService
+-> Guarded BigQuery CORE / MART reads
+-> bounded structured context
+-> Gemini
+-> validated InvestigationReport
+-> PostgreSQL checkpoint state
+```
+
+Gemini receives no SQL capability, database client, or autonomous tool loop.
+Application code copies authoritative risk score, level, model version, and
+factor scores from MART into the final report.
 
 Cloud Scheduler will eventually trigger scheduled workloads where appropriate.
 
@@ -306,7 +326,24 @@ This foundation persists investigation state and proves thread isolation. It
 does not call an LLM, query BigQuery, fabricate evidence, or calculate supplier
 risk.
 
-The future design must support persistent checkpoints and interrupt/resume human-in-the-loop behavior.
+Stage 15 adds the bounded investigation workflow:
+
+```text
+START
+-> initialize_investigation
+-> load_supplier_context
+-> load_risk_context
+-> load_risk_history
+-> load_evidence
+-> analyze_investigation
+-> finalize_investigation
+-> END
+```
+
+Retrieval, model, or evidence-citation validation failures persist `FAILED`
+state with safe error metadata. Successful investigations persist `COMPLETED`
+state and a structured `InvestigationReport`. The future design must support
+persistent checkpoints and interrupt/resume human-in-the-loop behavior.
 
 ## Planned User Experience
 

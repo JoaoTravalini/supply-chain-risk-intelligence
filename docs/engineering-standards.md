@@ -142,6 +142,22 @@ These standards define future project conventions. They are part of the Stage 0 
   deterministic risk engine to recalculate current risk.
 - Normal tests for agent data access must not require cloud credentials,
   network access, BigQuery, PostgreSQL, Docker, or LLM providers.
+- LLM workflows must not authoritatively calculate or overwrite risk scores,
+  risk levels, model versions, or factor scores.
+- Final agent reports must copy authoritative numeric risk fields from MART,
+  not parse them from model prose.
+- Model-generated evidence references must be allowlisted against retrieved
+  Canonical Event deduplication keys.
+- Retrieved user, supplier, provider, and payload text must be treated as
+  untrusted prompt content and passed through explicit context boundaries.
+- Model output must be structurally validated before it is persisted or
+  returned.
+- Agent workflows must avoid uncontrolled autonomous tool loops unless a later
+  explicit stage designs bounded policy for them.
+- Model and provider clients must be injected or constructed behind explicit
+  factories, not created at import time.
+- Normal agent workflow tests must remain independent from provider APIs,
+  network access, GCP, PostgreSQL, and Docker.
 
 ## Security
 

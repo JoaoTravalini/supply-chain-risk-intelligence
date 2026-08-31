@@ -108,6 +108,24 @@ Agent-facing reads do not expose RAW. RAW remains the audit, replay, and source
 history layer. The agent reads authoritative current risk from MART rather than
 recalculating it.
 
+Stage 15 uses that guarded path inside the LangGraph investigation workflow:
+
+```text
+InvestigationService
+-> LangGraph
+-> AgentDataService
+-> CORE supplier profile / CORE canonical evidence
+-> MART current risk / MART risk history
+-> bounded structured context
+-> Gemini explanation
+-> validated InvestigationReport
+-> PostgreSQL checkpoint state
+```
+
+The workflow does not read RAW, mutate BigQuery, recalculate risk, or let Gemini
+generate SQL. PostgreSQL checkpoints remain operational agent state rather than
+analytical warehouse data.
+
 Canonical Events always carry stable source identity through `source.provider` and `source_event_id`. Future source adapters are responsible for deriving deterministic source IDs from provider-specific natural keys when an upstream source does not expose a native stable identifier.
 
 The Supplier master-data contract now defines canonical supplier identity, category, criticality, location, exposure, lead time, dependency, and sourcing concentration. Canonical Supplier master data now exists as a versioned synthetic JSONL artifact validated through the Supplier v1 contract. Stage 11 defines the physical CORE supplier table and batch snapshot loader, but the live load remains deferred until after human approval of the OpenTofu plan and apply checkpoint.

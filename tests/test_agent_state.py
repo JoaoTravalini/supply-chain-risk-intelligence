@@ -72,7 +72,12 @@ def test_create_request_rejects_naive_timestamp() -> None:
 
 
 def test_explicit_status_lifecycle() -> None:
-    assert [status.value for status in InvestigationStatus] == ["CREATED", "READY", "FAILED"]
+    assert [status.value for status in InvestigationStatus] == [
+        "CREATED",
+        "READY",
+        "COMPLETED",
+        "FAILED",
+    ]
 
 
 def test_state_serialization_is_json_compatible_and_safe() -> None:
@@ -99,7 +104,16 @@ def test_state_serialization_is_json_compatible_and_safe() -> None:
         "created_at": "2026-08-29T12:00:00Z",
         "updated_at": "2026-08-29T12:00:00Z",
         "evidence_keys": ["0" * 64],
+        "supplier_profile": None,
+        "current_risk": None,
+        "risk_history": [],
+        "evidence": [],
+        "report": None,
+        "error_code": None,
         "error_message": None,
+        "provider_failure_category": None,
+        "provider_exception_class": None,
+        "provider_status_code": None,
     }
     assert restored == snapshot
     assert "client" not in state

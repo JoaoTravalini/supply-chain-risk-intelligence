@@ -2,17 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
+from datetime import datetime
 from typing import Any
 
 from pydantic import ValidationError
 
-from supplychain.agent.errors import AgentPersistenceError, InvestigationNotFoundError
+from supplychain.agent.context import InvestigationContextLimits
+from supplychain.agent.data import AgentDataService
+from supplychain.agent.errors import (
+    AgentConfigurationError,
+    AgentPersistenceError,
+    InvestigationNotFoundError,
+)
 from supplychain.agent.graph import (
     Checkpointer,
     CompiledInvestigationGraph,
     build_investigation_graph,
 )
+from supplychain.agent.llm import InvestigationModel
 from supplychain.agent.models import (
     CreateInvestigationRequest,
     InvestigationIdentity,
@@ -32,9 +40,27 @@ class InvestigationService:
         self,
         *,
         checkpointer: Checkpointer,
+        data_service: AgentDataService | None = None,
+        model: InvestigationModel | None = None,
+        context_limits: InvestigationContextLimits | None = None,
+        history_limit: int = 5,
+        now: Callable[[], datetime] | None = None,
         graph: CompiledInvestigationGraph | None = None,
+        investigation_graph: CompiledInvestigationGraph | None = None,
     ) -> None:
         self._graph = build_investigation_graph(checkpointer) if graph is None else graph
+        self._investigation_graph = investigation_graph
+        if self._investigation_graph is None and data_service is not None and model is not None:
+            self._investigation_graph = build_investigation_graph(
+                checkpointer,
+                data_service=data_service,
+                model=model,
+                context_limits=(
+                    InvestigationContextLimits() if context_limits is None else context_limits
+                ),
+                history_limit=history_limit,
+                now=now,
+            )
 
     def create_investigation(
         self,
@@ -69,6 +95,24 @@ class InvestigationService:
             raise AgentPersistenceError("Unable to create investigation state") from exc
         return snapshot_from_state(result)
 
+    def run_investigation(
+        self,
+        request: CreateInvestigationRequest,
+    ) -> InvestigationSnapshot:
+        """Run the Stage 15 evidence-grounded investigation workflow."""
+
+        if self._investigation_graph is None:
+            raise AgentConfigurationError("Investigation workflow dependencies are not configured")
+        initial_snapshot = self._initial_snapshot(request)
+        try:
+            result = self._investigation_graph.invoke(
+                snapshot_to_state(initial_snapshot),
+                thread_config(str(initial_snapshot.thread_id)),
+            )
+        except Exception as exc:
+            raise AgentPersistenceError("Unable to run investigation workflow") from exc
+        return snapshot_from_state(result)
+
     def get_investigation_state(self, thread_id: str) -> InvestigationSnapshot:
         """Retrieve the latest persisted state for one LangGraph thread."""
 
@@ -84,6 +128,26 @@ class InvestigationService:
             return snapshot_from_state(values)
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise AgentPersistenceError("Persisted investigation state is invalid") from exc
+
+    def _initial_snapshot(self, request: CreateInvestigationRequest) -> InvestigationSnapshot:
+        identity_data: dict[str, object] = {}
+        if request.investigation_id is not None:
+            identity_data["investigation_id"] = request.investigation_id
+        if request.thread_id is not None:
+            identity_data["thread_id"] = request.thread_id
+        identity = InvestigationIdentity.model_validate(identity_data)
+        created_at = require_aware_utc(request.created_at or utc_now())
+        return InvestigationSnapshot(
+            investigation_id=identity.investigation_id,
+            thread_id=identity.thread_id,
+            supplier_id=request.supplier_id,
+            question=request.question,
+            status=InvestigationStatus.CREATED,
+            created_at=created_at,
+            updated_at=created_at,
+            evidence_keys=(),
+            error_message=None,
+        )
 
 
 def thread_config(thread_id: str) -> MutableMapping[str, Any]:

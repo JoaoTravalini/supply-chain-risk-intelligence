@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable, MutableMapping
 from datetime import datetime
 from typing import Any
 
 from langgraph.types import Command
+from opentelemetry.trace import Span
 from pydantic import ValidationError
 
 from supplychain.agent.context import InvestigationContextLimits
@@ -36,6 +38,8 @@ from supplychain.agent.models import (
     snapshot_to_state,
     utc_now,
 )
+from supplychain.observability import ObservabilityRuntime, bind_observability_context
+from supplychain.observability.runtime import TelemetryOutcome, elapsed_ms
 
 
 class InvestigationService:
@@ -52,8 +56,17 @@ class InvestigationService:
         now: Callable[[], datetime] | None = None,
         graph: CompiledInvestigationGraph | None = None,
         investigation_graph: CompiledInvestigationGraph | None = None,
+        observability: ObservabilityRuntime | None = None,
     ) -> None:
-        self._graph = build_investigation_graph(checkpointer) if graph is None else graph
+        self._observability = observability or ObservabilityRuntime.disabled()
+        self._graph = (
+            build_investigation_graph(
+                checkpointer,
+                observability=self._observability,
+            )
+            if graph is None
+            else graph
+        )
         self._investigation_graph = investigation_graph
         if self._investigation_graph is None and data_service is not None and model is not None:
             self._investigation_graph = build_investigation_graph(
@@ -65,6 +78,7 @@ class InvestigationService:
                 ),
                 history_limit=history_limit,
                 now=now,
+                observability=self._observability,
             )
 
     def create_investigation(
@@ -109,14 +123,61 @@ class InvestigationService:
         if self._investigation_graph is None:
             raise AgentConfigurationError("Investigation workflow dependencies are not configured")
         initial_snapshot = self._initial_snapshot(request)
-        try:
-            result = self._investigation_graph.invoke(
-                snapshot_to_state(initial_snapshot),
-                thread_config(str(initial_snapshot.thread_id)),
-            )
-        except Exception as exc:
-            raise AgentPersistenceError("Unable to run investigation workflow") from exc
-        return snapshot_from_state(result)
+        started_at = time.perf_counter()
+        with (
+            bind_observability_context(
+                correlation_id=initial_snapshot.investigation_id,
+                investigation_id=initial_snapshot.investigation_id,
+                thread_id=initial_snapshot.thread_id,
+                generate_request_id=True,
+            ),
+            self._observability.span(
+                "supplychain.investigation.run",
+                attributes={
+                    "component": "investigation",
+                    "operation": "run_investigation",
+                    "supplier_id": initial_snapshot.supplier_id,
+                    "investigation_id": str(initial_snapshot.investigation_id),
+                    "thread_id": str(initial_snapshot.thread_id),
+                },
+            ) as span,
+        ):
+            try:
+                result = self._investigation_graph.invoke(
+                    snapshot_to_state(initial_snapshot),
+                    thread_config(str(initial_snapshot.thread_id)),
+                )
+                snapshot = snapshot_from_state(result)
+                outcome = (
+                    TelemetryOutcome.SUCCESS
+                    if snapshot.status is InvestigationStatus.COMPLETED
+                    else TelemetryOutcome.FAILURE
+                )
+                self._observability.record_operation(
+                    component="investigation",
+                    operation="run_investigation",
+                    outcome=outcome,
+                    duration_ms=elapsed_ms(started_at),
+                    attributes={
+                        "error_category": (
+                            snapshot.provider_failure_category.value
+                            if snapshot.provider_failure_category is not None
+                            else None
+                        ),
+                    },
+                )
+                self._observability.set_span_status(span, outcome)
+                return snapshot
+            except Exception as exc:
+                self._observability.record_operation(
+                    component="investigation",
+                    operation="run_investigation",
+                    outcome=TelemetryOutcome.FAILURE,
+                    duration_ms=elapsed_ms(started_at),
+                    attributes={"error_category": type(exc).__name__},
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.FAILURE)
+                raise AgentPersistenceError("Unable to run investigation workflow") from exc
 
     def get_investigation_state(self, thread_id: str) -> InvestigationSnapshot:
         """Retrieve the latest persisted state for one LangGraph thread."""
@@ -139,32 +200,100 @@ class InvestigationService:
 
         if self._investigation_graph is None:
             raise AgentConfigurationError("Investigation workflow dependencies are not configured")
-        current = self.get_investigation_state(str(request.thread_id))
-        if current.investigation_id != request.investigation_id:
-            raise HumanReviewTransitionError("Human review investigation identity did not match")
-        if current.thread_id != request.thread_id:
-            raise HumanReviewTransitionError("Human review thread identity did not match")
-        if current.human_review_status in {
-            HumanReviewStatus.APPROVED,
-            HumanReviewStatus.REJECTED,
-        }:
-            if _is_duplicate_review_submission(current, request):
-                return current
-            raise HumanReviewTransitionError("Human review has already been finalized")
-        if (
-            current.status is not InvestigationStatus.COMPLETED
-            or current.report is None
-            or current.human_review_status is not HumanReviewStatus.PENDING
+        started_at = time.perf_counter()
+        with (
+            bind_observability_context(
+                correlation_id=request.investigation_id,
+                investigation_id=request.investigation_id,
+                thread_id=request.thread_id,
+                generate_request_id=True,
+            ),
+            self._observability.span(
+                "supplychain.review.submit",
+                attributes={
+                    "component": "review",
+                    "operation": "submit_review",
+                    "review_decision": request.decision.value,
+                    "investigation_id": str(request.investigation_id),
+                    "thread_id": str(request.thread_id),
+                },
+            ) as span,
         ):
-            raise HumanReviewTransitionError("No human review is pending for this investigation")
-        try:
-            result = self._investigation_graph.invoke(
-                Command(resume=request.model_dump(mode="json")),
-                thread_config(str(request.thread_id)),
-            )
-        except Exception as exc:
-            raise AgentPersistenceError("Unable to submit human review") from exc
-        return snapshot_from_state(result)
+            try:
+                current = self.get_investigation_state(str(request.thread_id))
+                if current.investigation_id != request.investigation_id:
+                    self._record_review_transition(
+                        "invalid_transition",
+                        request.decision.value,
+                        started_at,
+                        span,
+                    )
+                    raise HumanReviewTransitionError(
+                        "Human review investigation identity did not match"
+                    )
+                if current.thread_id != request.thread_id:
+                    self._record_review_transition(
+                        "invalid_transition",
+                        request.decision.value,
+                        started_at,
+                        span,
+                    )
+                    raise HumanReviewTransitionError("Human review thread identity did not match")
+                if current.human_review_status in {
+                    HumanReviewStatus.APPROVED,
+                    HumanReviewStatus.REJECTED,
+                }:
+                    if _is_duplicate_review_submission(current, request):
+                        self._record_review_transition(
+                            "duplicate",
+                            request.decision.value,
+                            started_at,
+                            span,
+                        )
+                        return current
+                    self._record_review_transition(
+                        "invalid_transition",
+                        request.decision.value,
+                        started_at,
+                        span,
+                    )
+                    raise HumanReviewTransitionError("Human review has already been finalized")
+                if (
+                    current.status is not InvestigationStatus.COMPLETED
+                    or current.report is None
+                    or current.human_review_status is not HumanReviewStatus.PENDING
+                ):
+                    self._record_review_transition(
+                        "invalid_transition",
+                        request.decision.value,
+                        started_at,
+                        span,
+                    )
+                    raise HumanReviewTransitionError(
+                        "No human review is pending for this investigation"
+                    )
+                result = self._investigation_graph.invoke(
+                    Command(resume=request.model_dump(mode="json")),
+                    thread_config(str(request.thread_id)),
+                )
+                snapshot = snapshot_from_state(result)
+                self._record_review_transition(
+                    "success",
+                    request.decision.value,
+                    started_at,
+                    span,
+                )
+                return snapshot
+            except HumanReviewTransitionError:
+                raise
+            except Exception as exc:
+                self._record_review_transition(
+                    "failure",
+                    request.decision.value,
+                    started_at,
+                    span,
+                )
+                raise AgentPersistenceError("Unable to submit human review") from exc
 
     def _initial_snapshot(self, request: CreateInvestigationRequest) -> InvestigationSnapshot:
         identity_data: dict[str, object] = {}
@@ -184,6 +313,25 @@ class InvestigationService:
             updated_at=created_at,
             evidence_keys=(),
             error_message=None,
+        )
+
+    def _record_review_transition(
+        self,
+        outcome: str,
+        review_decision: str,
+        started_at: float,
+        span: Span | None,
+    ) -> None:
+        self._observability.record_operation(
+            component="review",
+            operation="submit_review",
+            outcome=outcome,
+            duration_ms=elapsed_ms(started_at),
+            attributes={"review_decision": review_decision},
+        )
+        self._observability.set_span_status(
+            span,
+            TelemetryOutcome.SUCCESS if outcome in {"success", "duplicate"} else outcome,
         )
 
 

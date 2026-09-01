@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 from uuid import UUID
 
+from opentelemetry.trace import Span
+
 from supplychain.contracts import CanonicalEvent
 from supplychain.messaging import ReceivedCanonicalEvent
+from supplychain.observability import ObservabilityRuntime, bind_observability_context
+from supplychain.observability.runtime import TelemetryOutcome, elapsed_ms
 from supplychain.processing.ledger import (
     ProcessingLedger,
     ProcessingResolution,
@@ -59,14 +64,55 @@ class ProcessingCoordinator:
         ledger: ProcessingLedger,
         handler: CanonicalEventHandler,
         acknowledger: MessageAcknowledger,
+        observability: ObservabilityRuntime | None = None,
     ) -> None:
         self._ledger = ledger
         self._handler = handler
         self._acknowledger = acknowledger
+        self._observability = observability or ObservabilityRuntime.disabled()
 
     def process(self, received_event: ReceivedCanonicalEvent) -> ProcessingCoordinatorResult:
         """Process one already-valid pulled Canonical Event delivery."""
 
+        event = received_event.event
+        started_at = time.perf_counter()
+        with (
+            bind_observability_context(
+                correlation_id=event.metadata.correlation_id,
+                event_id=event.event_id,
+                generate_request_id=True,
+            ),
+            self._observability.span(
+                "supplychain.event.process",
+                attributes={
+                    "component": "processing",
+                    "operation": "process_event",
+                    "event_id": str(event.event_id),
+                },
+            ) as span,
+        ):
+            try:
+                result = self._process_without_telemetry(received_event)
+            except Exception:
+                self._record_processing(
+                    outcome=TelemetryOutcome.FAILURE,
+                    processing_decision="exception",
+                    started_at=started_at,
+                    span=span,
+                )
+                raise
+            self._record_processing(
+                outcome=TelemetryOutcome.SUCCESS,
+                processing_decision=result.resolution.value,
+                started_at=started_at,
+                span=span,
+            )
+            return result
+
+    def _process_without_telemetry(
+        self,
+        received_event: ReceivedCanonicalEvent,
+    ) -> ProcessingCoordinatorResult:
         event = received_event.event
         assessment = self._ledger.assess(event)
         if assessment.resolution is ProcessingResolution.DUPLICATE:
@@ -111,6 +157,23 @@ class ProcessingCoordinator:
             outcome=outcome,
             acknowledged=True,
         )
+
+    def _record_processing(
+        self,
+        *,
+        outcome: str,
+        processing_decision: str,
+        started_at: float,
+        span: Span | None,
+    ) -> None:
+        self._observability.record_operation(
+            component="processing",
+            operation="process_event",
+            outcome=outcome,
+            duration_ms=elapsed_ms(started_at),
+            attributes={"processing_decision": processing_decision},
+        )
+        self._observability.set_span_status(span, outcome)
 
     def _acknowledge(self, received_event: ReceivedCanonicalEvent) -> None:
         self._acknowledger.acknowledge((received_event,))

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from importlib.resources import files
@@ -20,6 +21,8 @@ from supplychain.agent.data import (
     agent_bigquery_config_from_env,
 )
 from supplychain.domain import Criticality, SupplierCategory
+from supplychain.observability import ObservabilityRuntime
+from supplychain.observability.runtime import TelemetryOutcome, elapsed_ms
 from supplychain.risk import RiskFactorFamily, RiskLevel
 from supplychain.risk.models import EvidenceKey, RiskScore, SemanticVersion, SupplierId
 
@@ -91,9 +94,16 @@ class PortfolioSnapshot(StrictUiModel):
 class PortfolioDataService:
     """Read dashboard data through the existing guarded BigQuery reader."""
 
-    def __init__(self, config: AgentBigQueryConfig, *, reader: GuardedBigQueryReader) -> None:
+    def __init__(
+        self,
+        config: AgentBigQueryConfig,
+        *,
+        reader: GuardedBigQueryReader,
+        observability: ObservabilityRuntime | None = None,
+    ) -> None:
         self._config = config
         self._reader = reader
+        self._observability = observability or ObservabilityRuntime.disabled()
 
     @property
     def executions(self) -> tuple[QueryExecutionSummary, ...]:
@@ -109,22 +119,52 @@ class PortfolioDataService:
         """Read a bounded current supplier-risk portfolio snapshot."""
 
         _validate_portfolio_limit(limit)
-        rows = self._reader.read(_current_portfolio_spec(self._config, limit))
-        if len(rows) > limit:
-            raise AgentDataIntegrityError("Portfolio query exceeded requested limit")
-        portfolio_rows = tuple(_portfolio_row_from_bigquery(row) for row in rows)
-        return PortfolioSnapshot(
-            rows=portfolio_rows,
-            summary=portfolio_summary(portfolio_rows),
-            executions=self._reader.executions,
-        )
+        started_at = time.perf_counter()
+        with self._observability.span(
+            "supplychain.portfolio.load",
+            attributes={"component": "portfolio", "operation": "get_current_portfolio"},
+        ) as span:
+            try:
+                rows = self._reader.read(_current_portfolio_spec(self._config, limit))
+                if len(rows) > limit:
+                    raise AgentDataIntegrityError("Portfolio query exceeded requested limit")
+                portfolio_rows = tuple(_portfolio_row_from_bigquery(row) for row in rows)
+                snapshot = PortfolioSnapshot(
+                    rows=portfolio_rows,
+                    summary=portfolio_summary(portfolio_rows),
+                    executions=self._reader.executions,
+                )
+                self._observability.record_operation(
+                    component="portfolio",
+                    operation="get_current_portfolio",
+                    outcome=TelemetryOutcome.SUCCESS,
+                    duration_ms=elapsed_ms(started_at),
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.SUCCESS)
+                return snapshot
+            except Exception:
+                self._observability.record_operation(
+                    component="portfolio",
+                    operation="get_current_portfolio",
+                    outcome=TelemetryOutcome.FAILURE,
+                    duration_ms=elapsed_ms(started_at),
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.FAILURE)
+                raise
 
 
-def portfolio_data_service_from_env() -> PortfolioDataService:
+def portfolio_data_service_from_env(
+    observability: ObservabilityRuntime | None = None,
+) -> PortfolioDataService:
     """Create the dashboard data service from existing BigQuery environment config."""
 
     config = agent_bigquery_config_from_env()
-    return PortfolioDataService(config, reader=GuardedBigQueryReader(config))
+    runtime = observability or ObservabilityRuntime.disabled()
+    return PortfolioDataService(
+        config,
+        reader=GuardedBigQueryReader(config, observability=runtime),
+        observability=runtime,
+    )
 
 
 def portfolio_summary(rows: tuple[PortfolioSupplierRiskRow, ...]) -> PortfolioSummary:

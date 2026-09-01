@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Mapping, Sequence
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from uuid import UUID
 
 from google.api_core.exceptions import AlreadyExists, GoogleAPICallError, NotFound, RetryError
 from google.cloud import pubsub_v1  # type: ignore[attr-defined]
+from opentelemetry.trace import Span
 
 from supplychain.contracts import CanonicalEvent
 from supplychain.messaging.errors import (
@@ -35,6 +37,8 @@ from supplychain.messaging.topology import (
     PubSubSubscriptionConfig,
     PubSubTopicConfig,
 )
+from supplychain.observability import ObservabilityRuntime, bind_observability_context
+from supplychain.observability.runtime import TelemetryOutcome, elapsed_ms
 
 
 class PublishFuture(Protocol):
@@ -181,11 +185,13 @@ class PubSubCanonicalEventPublisher:
         config: PubSubTopicConfig,
         *,
         client: PublisherClient | None = None,
+        observability: ObservabilityRuntime | None = None,
     ) -> None:
         self._config = config
         self._client = pubsub_v1.PublisherClient() if client is None else client
         self._owns_client = client is None
         self._topic_path = self._client.topic_path(config.project_id, config.topic_id)
+        self._observability = observability or ObservabilityRuntime.disabled()
 
     @property
     def topic_path(self) -> str:
@@ -196,31 +202,68 @@ class PubSubCanonicalEventPublisher:
     def publish(self, event: CanonicalEvent) -> PublishReceipt:
         """Serialize, attribute, publish, and await acknowledgement for one event."""
 
-        data = serialize_canonical_event(event)
-        attributes = canonical_event_attributes(event)
-        try:
-            future = self._client.publish(self._topic_path, data, **attributes)
-            message_id = future.result(timeout=self._config.publish_ack_timeout_seconds)
-        except FutureTimeoutError as exc:
-            raise MessagePublishTimeoutError(
-                "Pub/Sub publish acknowledgement timed out",
-                project_id=self._config.project_id,
+        started_at = time.perf_counter()
+        with (
+            bind_observability_context(
+                correlation_id=event.metadata.correlation_id,
+                event_id=event.event_id,
+                generate_request_id=True,
+            ),
+            self._observability.span(
+                "supplychain.pubsub.publish",
+                attributes={
+                    "component": "pubsub",
+                    "operation": "publish",
+                    "event_id": str(event.event_id),
+                },
+            ) as span,
+        ):
+            data = serialize_canonical_event(event)
+            attributes = canonical_event_attributes(event)
+            try:
+                future = self._client.publish(self._topic_path, data, **attributes)
+                message_id = future.result(timeout=self._config.publish_ack_timeout_seconds)
+            except FutureTimeoutError as exc:
+                _record_pubsub(
+                    self._observability,
+                    "publish",
+                    TelemetryOutcome.FAILURE,
+                    started_at,
+                    span,
+                )
+                raise MessagePublishTimeoutError(
+                    "Pub/Sub publish acknowledgement timed out",
+                    project_id=self._config.project_id,
+                    topic_id=self._config.topic_id,
+                    topic_path=self._topic_path,
+                ) from exc
+            except (GoogleAPICallError, RetryError) as exc:
+                _record_pubsub(
+                    self._observability,
+                    "publish",
+                    TelemetryOutcome.FAILURE,
+                    started_at,
+                    span,
+                )
+                raise MessagePublishError(
+                    "Pub/Sub publish failed",
+                    project_id=self._config.project_id,
+                    topic_id=self._config.topic_id,
+                    topic_path=self._topic_path,
+                ) from exc
+            _record_pubsub(
+                self._observability,
+                "publish",
+                TelemetryOutcome.SUCCESS,
+                started_at,
+                span,
+            )
+            return PublishReceipt(
+                message_id=message_id,
+                event_id=event.event_id,
                 topic_id=self._config.topic_id,
                 topic_path=self._topic_path,
-            ) from exc
-        except (GoogleAPICallError, RetryError) as exc:
-            raise MessagePublishError(
-                "Pub/Sub publish failed",
-                project_id=self._config.project_id,
-                topic_id=self._config.topic_id,
-                topic_path=self._topic_path,
-            ) from exc
-        return PublishReceipt(
-            message_id=message_id,
-            event_id=event.event_id,
-            topic_id=self._config.topic_id,
-            topic_path=self._topic_path,
-        )
+            )
 
     def close(self) -> None:
         """Close the owned Pub/Sub client; injected clients remain caller-owned."""
@@ -243,6 +286,7 @@ class PubSubCanonicalEventConsumer:
         config: PubSubSubscriptionConfig,
         *,
         client: SubscriberClient | None = None,
+        observability: ObservabilityRuntime | None = None,
     ) -> None:
         self._config = config
         self._client = pubsub_v1.SubscriberClient() if client is None else client
@@ -251,6 +295,7 @@ class PubSubCanonicalEventConsumer:
             config.project_id,
             config.subscription_id,
         )
+        self._observability = observability or ObservabilityRuntime.disabled()
 
     @property
     def subscription_path(self) -> str:
@@ -270,24 +315,40 @@ class PubSubCanonicalEventConsumer:
             max_messages=max_messages,
             timeout_seconds=timeout_seconds,
         )
-        try:
-            response = cast(
-                PullResponse,
-                self._client.pull(
-                    request={
-                        "subscription": self._subscription_path,
-                        "max_messages": max_messages,
-                    },
-                    timeout=timeout,
-                ),
-            )
-        except (GoogleAPICallError, RetryError) as exc:
-            raise MessagePullError(
-                "Pub/Sub pull failed",
-                project_id=self._config.project_id,
-                topic_path=self._subscription_path,
-            ) from exc
-        return tuple(_received_message_to_canonical(item) for item in response.received_messages)
+        started_at = time.perf_counter()
+        with self._observability.span(
+            "supplychain.pubsub.consume",
+            attributes={"component": "pubsub", "operation": "pull"},
+        ) as span:
+            try:
+                response = cast(
+                    PullResponse,
+                    self._client.pull(
+                        request={
+                            "subscription": self._subscription_path,
+                            "max_messages": max_messages,
+                        },
+                        timeout=timeout,
+                    ),
+                )
+                messages = tuple(
+                    _received_message_to_canonical(item) for item in response.received_messages
+                )
+            except (GoogleAPICallError, RetryError) as exc:
+                _record_pubsub(
+                    self._observability,
+                    "pull",
+                    TelemetryOutcome.FAILURE,
+                    started_at,
+                    span,
+                )
+                raise MessagePullError(
+                    "Pub/Sub pull failed",
+                    project_id=self._config.project_id,
+                    topic_path=self._subscription_path,
+                ) from exc
+            _record_pubsub(self._observability, "pull", TelemetryOutcome.SUCCESS, started_at, span)
+            return messages
 
     def acknowledge(self, received_messages: tuple[ReceivedCanonicalEvent, ...]) -> None:
         """Explicitly acknowledge pulled messages after caller validation/processing."""
@@ -295,19 +356,38 @@ class PubSubCanonicalEventConsumer:
         ack_ids = _unique_ack_ids(received_messages)
         if not ack_ids:
             return
-        try:
-            self._client.acknowledge(
-                request={
-                    "subscription": self._subscription_path,
-                    "ack_ids": ack_ids,
-                },
+        started_at = time.perf_counter()
+        with self._observability.span(
+            "supplychain.pubsub.ack",
+            attributes={"component": "pubsub", "operation": "acknowledge"},
+        ) as span:
+            try:
+                self._client.acknowledge(
+                    request={
+                        "subscription": self._subscription_path,
+                        "ack_ids": ack_ids,
+                    },
+                )
+            except (GoogleAPICallError, RetryError) as exc:
+                _record_pubsub(
+                    self._observability,
+                    "acknowledge",
+                    TelemetryOutcome.FAILURE,
+                    started_at,
+                    span,
+                )
+                raise MessageAcknowledgeError(
+                    "Pub/Sub acknowledgement failed",
+                    project_id=self._config.project_id,
+                    topic_path=self._subscription_path,
+                ) from exc
+            _record_pubsub(
+                self._observability,
+                "acknowledge",
+                TelemetryOutcome.SUCCESS,
+                started_at,
+                span,
             )
-        except (GoogleAPICallError, RetryError) as exc:
-            raise MessageAcknowledgeError(
-                "Pub/Sub acknowledgement failed",
-                project_id=self._config.project_id,
-                topic_path=self._subscription_path,
-            ) from exc
 
     def request_redelivery(self, received_messages: tuple[ReceivedCanonicalEvent, ...]) -> None:
         """Request redelivery by setting the acknowledgement deadline to zero."""
@@ -315,20 +395,39 @@ class PubSubCanonicalEventConsumer:
         ack_ids = _unique_ack_ids(received_messages)
         if not ack_ids:
             return
-        try:
-            self._client.modify_ack_deadline(
-                request={
-                    "subscription": self._subscription_path,
-                    "ack_ids": ack_ids,
-                    "ack_deadline_seconds": 0,
-                },
+        started_at = time.perf_counter()
+        with self._observability.span(
+            "supplychain.pubsub.redelivery",
+            attributes={"component": "pubsub", "operation": "request_redelivery"},
+        ) as span:
+            try:
+                self._client.modify_ack_deadline(
+                    request={
+                        "subscription": self._subscription_path,
+                        "ack_ids": ack_ids,
+                        "ack_deadline_seconds": 0,
+                    },
+                )
+            except (GoogleAPICallError, RetryError) as exc:
+                _record_pubsub(
+                    self._observability,
+                    "request_redelivery",
+                    TelemetryOutcome.FAILURE,
+                    started_at,
+                    span,
+                )
+                raise MessageRedeliveryRequestError(
+                    "Pub/Sub redelivery request failed",
+                    project_id=self._config.project_id,
+                    topic_path=self._subscription_path,
+                ) from exc
+            _record_pubsub(
+                self._observability,
+                "request_redelivery",
+                TelemetryOutcome.SUCCESS,
+                started_at,
+                span,
             )
-        except (GoogleAPICallError, RetryError) as exc:
-            raise MessageRedeliveryRequestError(
-                "Pub/Sub redelivery request failed",
-                project_id=self._config.project_id,
-                topic_path=self._subscription_path,
-            ) from exc
 
     def close(self) -> None:
         """Close the owned Pub/Sub client; injected clients remain caller-owned."""
@@ -626,3 +725,19 @@ def _unique_ack_ids(received_messages: tuple[ReceivedCanonicalEvent, ...]) -> li
             ack_ids.append(message.ack_id)
             seen.add(message.ack_id)
     return ack_ids
+
+
+def _record_pubsub(
+    observability: ObservabilityRuntime,
+    operation: str,
+    outcome: str,
+    started_at: float,
+    span: Span | None,
+) -> None:
+    observability.record_operation(
+        component="pubsub",
+        operation=operation,
+        outcome=outcome,
+        duration_ms=elapsed_ms(started_at),
+    )
+    observability.set_span_status(span, outcome)

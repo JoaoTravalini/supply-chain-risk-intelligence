@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
@@ -20,6 +21,8 @@ from supplychain.agent.errors import (
 )
 from supplychain.agent.prompts import INVESTIGATION_SYSTEM_INSTRUCTION
 from supplychain.agent.reports import InvestigationAnalysis
+from supplychain.observability import ObservabilityRuntime
+from supplychain.observability.runtime import TelemetryOutcome, elapsed_ms
 
 GEMINI_API_KEY_ENV = "GEMINI_API_KEY"
 SUPPLYCHAIN_GEMINI_MODEL_ENV = "SUPPLYCHAIN_GEMINI_MODEL"
@@ -66,10 +69,12 @@ class GeminiInvestigationModel:
         config: GeminiInvestigationModelConfig,
         *,
         client: object | None = None,
+        observability: ObservabilityRuntime | None = None,
     ) -> None:
         self._config = config
         self._client = client
         self._provider_calls = 0
+        self._observability = observability or ObservabilityRuntime.disabled()
 
     @property
     def provider_calls(self) -> int:
@@ -89,19 +94,75 @@ class GeminiInvestigationModel:
             sort_keys=True,
             separators=(",", ":"),
         )
-        try:
-            response = cast(Any, client).models.generate_content(
-                model=self._config.model_name,
-                contents=request_payload,
-                config=self._generation_config(),
+        started_at = time.perf_counter()
+        with self._observability.span(
+            "supplychain.investigation.model",
+            attributes={
+                "component": "investigation_model",
+                "operation": "gemini_generate_content",
+                "provider_model": self._config.model_name,
+            },
+        ) as span:
+            try:
+                response = cast(Any, client).models.generate_content(
+                    model=self._config.model_name,
+                    contents=request_payload,
+                    config=self._generation_config(),
+                )
+                self._provider_calls += 1
+            except Exception as exc:
+                diagnostic = classify_provider_failure(exc)
+                self._observability.record_operation(
+                    component="investigation_model",
+                    operation="gemini_generate_content",
+                    outcome=TelemetryOutcome.FAILURE,
+                    duration_ms=elapsed_ms(started_at),
+                    attributes={
+                        "provider_model": self._config.model_name,
+                        "error_category": diagnostic.category.value,
+                    },
+                )
+                self._observability.log_event(
+                    "investigation.model.failure",
+                    component="investigation_model",
+                    outcome=TelemetryOutcome.FAILURE,
+                    fields={
+                        "operation": "gemini_generate_content",
+                        "provider_model": self._config.model_name,
+                        "error_category": diagnostic.category.value,
+                        "exception_class": diagnostic.exception_class,
+                        "status_code": diagnostic.status_code,
+                    },
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.FAILURE)
+                raise InvestigationModelError(
+                    "Gemini investigation analysis failed",
+                    provider_failure=diagnostic,
+                ) from exc
+            try:
+                analysis = _analysis_from_response(response)
+            except InvestigationOutputValidationError:
+                self._observability.record_operation(
+                    component="investigation_model",
+                    operation="gemini_generate_content",
+                    outcome=TelemetryOutcome.FAILURE,
+                    duration_ms=elapsed_ms(started_at),
+                    attributes={
+                        "provider_model": self._config.model_name,
+                        "error_category": "output_validation",
+                    },
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.FAILURE)
+                raise
+            self._observability.record_operation(
+                component="investigation_model",
+                operation="gemini_generate_content",
+                outcome=TelemetryOutcome.SUCCESS,
+                duration_ms=elapsed_ms(started_at),
+                attributes={"provider_model": self._config.model_name},
             )
-            self._provider_calls += 1
-        except Exception as exc:
-            raise InvestigationModelError(
-                "Gemini investigation analysis failed",
-                provider_failure=classify_provider_failure(exc),
-            ) from exc
-        return _analysis_from_response(response)
+            self._observability.set_span_status(span, TelemetryOutcome.SUCCESS)
+            return analysis
 
     def _build_client(self) -> object:
         from google import genai
@@ -136,10 +197,12 @@ def gemini_config_from_env() -> GeminiInvestigationModelConfig:
     return GeminiInvestigationModelConfig(api_key=api_key, model_name=model_name)
 
 
-def gemini_investigation_model_from_env() -> GeminiInvestigationModel:
+def gemini_investigation_model_from_env(
+    observability: ObservabilityRuntime | None = None,
+) -> GeminiInvestigationModel:
     """Create a Gemini-backed investigation model from environment configuration."""
 
-    return GeminiInvestigationModel(gemini_config_from_env())
+    return GeminiInvestigationModel(gemini_config_from_env(), observability=observability)
 
 
 def classify_provider_failure(exc: BaseException) -> ProviderFailureDiagnostic:

@@ -20,6 +20,8 @@ from supplychain.agent.models import (
 )
 from supplychain.agent.reports import InvestigationReport
 from supplychain.contracts import CanonicalEvent
+from supplychain.observability import ObservabilityRuntime, bind_observability_context
+from supplychain.observability.runtime import TelemetryOutcome
 from supplychain.risk import RiskLevel, SupplierRiskAssessment
 from supplychain.ui.data import (
     DEFAULT_PORTFOLIO_LIMIT,
@@ -39,6 +41,7 @@ from supplychain.ui.presentation import (
 from supplychain.ui.resources import (
     agent_data_service_resource,
     investigation_service_resource,
+    observability_runtime_resource,
     portfolio_service_resource,
 )
 
@@ -154,8 +157,22 @@ def render_risk_portfolio_page(
     st.subheader("Current Supplier Risk")
     st.dataframe(portfolio_table_rows(filtered), use_container_width=True, hide_index=True)
     if st.button("Refresh portfolio"):
-        st.session_state.pop(PORTFOLIO_STATE_KEY, None)
-        st.rerun()
+        runtime = _observability_runtime()
+        with bind_observability_context(generate_request_id=True):
+            runtime.log_event(
+                "ui.portfolio.refresh",
+                component="streamlit",
+                outcome=TelemetryOutcome.SUCCESS,
+                fields={"operation": "portfolio_refresh"},
+            )
+            runtime.record_operation(
+                component="streamlit",
+                operation="portfolio_refresh",
+                outcome=TelemetryOutcome.SUCCESS,
+                duration_ms=0.0,
+            )
+            st.session_state.pop(PORTFOLIO_STATE_KEY, None)
+            st.rerun()
 
 
 def render_supplier_explorer_page(
@@ -246,18 +263,32 @@ def render_ai_investigation_page(
         if service is None:
             st.error("Investigation workflow is unavailable until configuration is complete.")
         else:
-            with st.spinner("Running investigation"):
-                try:
-                    result = service.run_investigation(
-                        CreateInvestigationRequest(
-                            supplier_id=supplier.supplier_id,
-                            question=question,
-                            created_at=datetime.now(UTC),
+            runtime = _observability_runtime()
+            with bind_observability_context(generate_request_id=True) as context:
+                runtime.log_event(
+                    "ui.investigation.run",
+                    component="streamlit",
+                    outcome="started",
+                    fields={"operation": "investigation_run"},
+                )
+                runtime.record_operation(
+                    component="streamlit",
+                    operation="investigation_run",
+                    outcome="started",
+                    duration_ms=0.0,
+                )
+                with st.spinner("Running investigation"):
+                    try:
+                        result = service.run_investigation(
+                            CreateInvestigationRequest(
+                                supplier_id=supplier.supplier_id,
+                                question=question,
+                                created_at=datetime.now(UTC),
+                            )
                         )
-                    )
-                    st.session_state[ACTIVE_INVESTIGATION_STATE_KEY] = result
-                except (AgentError, AgentDataError, ValidationError) as exc:
-                    st.error(safe_error_message(exc))
+                        st.session_state[ACTIVE_INVESTIGATION_STATE_KEY] = result
+                    except (AgentError, AgentDataError, ValidationError) as exc:
+                        st.error(_safe_action_error(exc, context.request_id))
 
     active = _active_investigation()
     if active is None:
@@ -417,21 +448,44 @@ def _render_review_form(
     if resolved_service is None:
         st.error("Investigation workflow is unavailable until configuration is complete.")
         return
-    with st.spinner("Submitting review"):
-        try:
-            reviewed = resolved_service.submit_review(
-                SubmitHumanReviewRequest(
-                    investigation_id=snapshot.investigation_id,
-                    thread_id=snapshot.thread_id,
-                    decision=HumanReviewDecision(decision),
-                    reviewer_id=reviewer_id,
-                    reviewed_at=datetime.now(UTC),
-                    reason=reason or None,
+    with bind_observability_context(
+        correlation_id=snapshot.investigation_id,
+        investigation_id=snapshot.investigation_id,
+        thread_id=snapshot.thread_id,
+        generate_request_id=True,
+    ) as context:
+        runtime = _observability_runtime()
+        runtime.log_event(
+            "ui.review.submit",
+            component="streamlit",
+            outcome="started",
+            fields={
+                "operation": "review_submit",
+                "review_decision": decision,
+            },
+        )
+        runtime.record_operation(
+            component="streamlit",
+            operation="review_submit",
+            outcome="started",
+            duration_ms=0.0,
+            attributes={"review_decision": decision},
+        )
+        with st.spinner("Submitting review"):
+            try:
+                reviewed = resolved_service.submit_review(
+                    SubmitHumanReviewRequest(
+                        investigation_id=snapshot.investigation_id,
+                        thread_id=snapshot.thread_id,
+                        decision=HumanReviewDecision(decision),
+                        reviewer_id=reviewer_id,
+                        reviewed_at=datetime.now(UTC),
+                        reason=reason or None,
+                    )
                 )
-            )
-        except (AgentError, ValidationError) as exc:
-            st.error(safe_error_message(exc))
-            return
+            except (AgentError, ValidationError) as exc:
+                st.error(_safe_action_error(exc, context.request_id))
+                return
     st.session_state[ACTIVE_INVESTIGATION_STATE_KEY] = reviewed
     st.success("Review submitted.")
     st.rerun()
@@ -477,6 +531,20 @@ def _safe_portfolio_service() -> PortfolioDataServiceLike | None:
         return portfolio_service_resource()
     except (AgentConfigurationError, AgentPersistenceError, AgentDataError):
         return None
+
+
+def _observability_runtime() -> ObservabilityRuntime:
+    try:
+        return observability_runtime_resource()
+    except Exception:
+        return ObservabilityRuntime.disabled()
+
+
+def _safe_action_error(exc: Exception, request_id: str | None) -> str:
+    message = safe_error_message(exc)
+    if request_id is None:
+        return message
+    return f"{message} Reference: {request_id}"
 
 
 def _agent_data_service(service: AgentDataServiceLike | None) -> AgentDataServiceLike | None:

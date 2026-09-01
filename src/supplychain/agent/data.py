@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import os
+import time
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -18,6 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue, StringConstraints,
 
 from supplychain.contracts import CanonicalEvent, EventType
 from supplychain.domain import Criticality, Supplier, SupplierCategory
+from supplychain.observability import ObservabilityRuntime
+from supplychain.observability.runtime import TelemetryOutcome, elapsed_ms
 from supplychain.risk import RiskFactorFamily, RiskLevel, SupplierRiskAssessment
 from supplychain.risk.models import EvidenceKey, SupplierId
 from supplychain.warehouse import (
@@ -207,6 +210,7 @@ class GuardedBigQueryReader:
         config: AgentBigQueryConfig,
         *,
         client: BigQueryReadClient | None = None,
+        observability: ObservabilityRuntime | None = None,
     ) -> None:
         self._config = config
         self._client = (
@@ -216,6 +220,7 @@ class GuardedBigQueryReader:
         )
         self._owns_client = client is None
         self._executions: list[QueryExecutionSummary] = []
+        self._observability = observability or ObservabilityRuntime.disabled()
 
     @property
     def executions(self) -> tuple[QueryExecutionSummary, ...]:
@@ -226,25 +231,75 @@ class GuardedBigQueryReader:
     def read(self, spec: _QuerySpec) -> tuple[object, ...]:
         """Run dry-run budget validation before executing an allowlisted query."""
 
-        estimated_bytes = self._dry_run(spec)
-        if estimated_bytes > self._config.max_bytes_billed:
-            raise QueryBudgetExceededError(
-                "BigQuery query estimate exceeds budget: "
-                f"estimated_bytes={estimated_bytes} "
-                f"allowed_bytes={self._config.max_bytes_billed}"
-            )
-        rows = self._execute(spec)
-        if len(rows) > spec.max_result_rows:
-            raise AgentDataIntegrityError("BigQuery query returned too many rows")
-        self._executions.append(
-            QueryExecutionSummary(
-                operation_name=spec.name,
-                estimated_bytes_processed=estimated_bytes,
-                maximum_bytes_billed=self._config.max_bytes_billed,
-                row_count=len(rows),
-            )
-        )
-        return rows
+        started_at = time.perf_counter()
+        estimated_bytes: int | None = None
+        row_count: int | None = None
+        with self._observability.span(
+            "supplychain.bigquery.read",
+            attributes={
+                "component": "bigquery",
+                "operation": spec.name,
+            },
+        ) as span:
+            try:
+                estimated_bytes = self._dry_run(spec)
+                if span is not None:
+                    span.set_attribute("estimated_bytes", estimated_bytes)
+                    span.set_attribute("maximum_bytes_billed", self._config.max_bytes_billed)
+                if estimated_bytes > self._config.max_bytes_billed:
+                    self._observability.record_bigquery_read(
+                        operation=spec.name,
+                        outcome=TelemetryOutcome.BUDGET_REJECTED,
+                        estimated_bytes=estimated_bytes,
+                        maximum_bytes_billed=self._config.max_bytes_billed,
+                        row_count=None,
+                        duration_ms=elapsed_ms(started_at),
+                        error_category="budget",
+                    )
+                    self._observability.set_span_status(span, TelemetryOutcome.BUDGET_REJECTED)
+                    raise QueryBudgetExceededError(
+                        "BigQuery query estimate exceeds budget: "
+                        f"estimated_bytes={estimated_bytes} "
+                        f"allowed_bytes={self._config.max_bytes_billed}"
+                    )
+                rows = self._execute(spec)
+                row_count = len(rows)
+                if row_count > spec.max_result_rows:
+                    raise AgentDataIntegrityError("BigQuery query returned too many rows")
+                self._executions.append(
+                    QueryExecutionSummary(
+                        operation_name=spec.name,
+                        estimated_bytes_processed=estimated_bytes,
+                        maximum_bytes_billed=self._config.max_bytes_billed,
+                        row_count=row_count,
+                    )
+                )
+                if span is not None:
+                    span.set_attribute("row_count", row_count)
+                self._observability.record_bigquery_read(
+                    operation=spec.name,
+                    outcome=TelemetryOutcome.SUCCESS,
+                    estimated_bytes=estimated_bytes,
+                    maximum_bytes_billed=self._config.max_bytes_billed,
+                    row_count=row_count,
+                    duration_ms=elapsed_ms(started_at),
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.SUCCESS)
+                return rows
+            except QueryBudgetExceededError:
+                raise
+            except Exception:
+                self._observability.record_bigquery_read(
+                    operation=spec.name,
+                    outcome=TelemetryOutcome.FAILURE,
+                    estimated_bytes=estimated_bytes,
+                    maximum_bytes_billed=self._config.max_bytes_billed,
+                    row_count=row_count,
+                    duration_ms=elapsed_ms(started_at),
+                    error_category="query",
+                )
+                self._observability.set_span_status(span, TelemetryOutcome.FAILURE)
+                raise
 
     def _dry_run(self, spec: _QuerySpec) -> int:
         job_config = _query_job_config(

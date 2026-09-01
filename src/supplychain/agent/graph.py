@@ -43,6 +43,7 @@ from supplychain.agent.reports import (
 from supplychain.agent.validation import InvestigationReportValidator
 from supplychain.contracts import CanonicalEvent
 from supplychain.domain import Supplier
+from supplychain.observability import ObservabilityRuntime
 from supplychain.risk import SupplierRiskAssessment
 from supplychain.risk.models import EvidenceKey
 
@@ -71,6 +72,7 @@ def build_investigation_graph(
     context_limits: InvestigationContextLimits | None = None,
     history_limit: int = 5,
     now: Callable[[], datetime] | None = None,
+    observability: ObservabilityRuntime | None = None,
 ) -> CompiledInvestigationGraph:
     """Compile the investigation graph with explicit dependencies."""
 
@@ -110,7 +112,10 @@ def build_investigation_graph(
             ),
         )
         graph.add_node("finalize_investigation", finalize_investigation)
-        graph.add_node("validate_report", validate_report)
+        graph.add_node(
+            "validate_report",
+            lambda state: validate_report(state, observability=observability),
+        )
         graph.add_node("human_review", human_review)
         graph.add_node("finalize_review", finalize_review)
         graph.add_edge("initialize_investigation", "load_supplier_context")
@@ -345,7 +350,11 @@ def finalize_investigation(state: InvestigationState) -> InvestigationState:
     }
 
 
-def validate_report(state: InvestigationState) -> InvestigationState:
+def validate_report(
+    state: InvestigationState,
+    *,
+    observability: ObservabilityRuntime | None = None,
+) -> InvestigationState:
     """Validate the produced report before requesting human review."""
 
     if _is_failed(state):
@@ -360,7 +369,7 @@ def validate_report(state: InvestigationState) -> InvestigationState:
             )
         current_risk = _state_model(SupplierRiskAssessment, state.get("current_risk"))
         evidence = tuple(_state_model(CanonicalEvent, item) for item in state.get("evidence", []))
-        validation = InvestigationReportValidator().validate(
+        validation = InvestigationReportValidator(observability=observability).validate(
             report=snapshot.report,
             current_risk=current_risk,
             evidence=evidence,

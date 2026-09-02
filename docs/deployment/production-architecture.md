@@ -111,7 +111,9 @@ The production root models:
 
 Cloud Run deployment is gated by `enable_cloud_run_service`, which
 defaults to `false`. Managed PostgreSQL is gated by
-`enable_managed_postgres`, which also defaults to `false`.
+`enable_managed_postgres`, which also defaults to `false`. The Cloud SQL
+Admin API is included only when managed PostgreSQL is explicitly enabled.
+The dashboard-first initial deployment path does not require Cloud SQL.
 
 ## Deployment Phases
 
@@ -119,6 +121,8 @@ Production deployment is intentionally split:
 
 1. Foundation: APIs, state bucket, WIF, Artifact Registry, identities,
    Pub/Sub, secret containers, and optionally Cloud SQL after cost review.
+   With the dashboard-first strategy and `enable_managed_postgres=false`,
+   Cloud SQL and the Cloud SQL Admin API remain out of scope.
 2. Secret seeding: human-approved Secret Manager versions for credentials
    and connection strings. Secret values never enter Git, workflows,
    Docker layers, OpenTofu source, or example tfvars.

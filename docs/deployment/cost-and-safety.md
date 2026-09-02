@@ -30,8 +30,15 @@ The production root uses safety-first defaults:
 - finite maximum instances;
 - managed PostgreSQL disabled;
 - Cloud SQL deletion protection enabled when created;
+- Cloud SQL Admin API enabled only when managed PostgreSQL is explicitly
+  enabled;
 - no secret versions or values in OpenTofu;
 - no RAW BigQuery access for the runtime identity.
+
+The dashboard-first initial deployment does not require Cloud SQL or the
+Cloud SQL Admin API. Persistent LangGraph investigation and HITL
+production capability remains deferred until managed PostgreSQL is
+approved.
 
 ## Billing Boundary
 

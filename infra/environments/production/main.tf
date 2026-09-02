@@ -5,7 +5,7 @@ locals {
     managed_by  = "opentofu"
   }
 
-  production_services = toset([
+  base_production_services = [
     "artifactregistry.googleapis.com",
     "bigquery.googleapis.com",
     "iam.googleapis.com",
@@ -14,9 +14,17 @@ locals {
     "run.googleapis.com",
     "secretmanager.googleapis.com",
     "serviceusage.googleapis.com",
-    "sqladmin.googleapis.com",
     "sts.googleapis.com",
-  ])
+  ]
+
+  managed_postgres_services = var.enable_managed_postgres ? [
+    "sqladmin.googleapis.com",
+  ] : []
+
+  production_services = toset(concat(
+    local.base_production_services,
+    local.managed_postgres_services,
+  ))
 
   non_secret_environment = {
     SUPPLYCHAIN_GCP_PROJECT_ID                  = var.data_project_id

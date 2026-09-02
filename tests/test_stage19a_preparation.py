@@ -53,6 +53,39 @@ def test_public_cloud_run_access_is_disabled_by_default() -> None:
     assert "var.enable_cloud_run_service && var.allow_unauthenticated ? 1 : 0" in main
 
 
+def test_cloud_run_deployment_and_min_instances_are_safe_by_default() -> None:
+    variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
+
+    assert re.search(
+        r'variable\s+"enable_cloud_run_service"\s+\{[\s\S]*?default\s+=\s+false',
+        variables,
+    )
+    assert re.search(
+        r'variable\s+"cloud_run_min_instances"\s+\{[\s\S]*?default\s+=\s+0',
+        variables,
+    )
+
+
+def test_cloud_sql_admin_api_is_gated_by_managed_postgres_flag() -> None:
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+    base_services = _local_list(main, "base_production_services")
+    managed_postgres_services = _local_list(main, "managed_postgres_services")
+
+    assert "sqladmin.googleapis.com" not in base_services
+    assert managed_postgres_services == ["sqladmin.googleapis.com"]
+    assert "var.enable_managed_postgres ? [" in main
+    assert "local.managed_postgres_services" in main
+
+
+def test_cloud_sql_resources_remain_gated_by_managed_postgres_flag() -> None:
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert 'resource "google_sql_database_instance" "agent"' in main
+    assert "count = var.enable_managed_postgres ? 1 : 0" in main
+    assert "cloud_sql_instances = var.enable_managed_postgres ?" in main
+    assert 'resource "google_project_iam_member" "runtime_cloudsql_client"' in main
+
+
 def test_runtime_bigquery_iam_excludes_raw_dataset() -> None:
     production_text = "\n".join(
         path.read_text(encoding="utf-8") for path in PRODUCTION_ROOT.glob("*.tf")
@@ -98,3 +131,9 @@ def test_dockerignore_excludes_credentials_state_and_non_runtime_content() -> No
     )
     for pattern in required_patterns:
         assert pattern in dockerignore
+
+
+def _local_list(text: str, name: str) -> list[str]:
+    match = re.search(rf"{name}\s+=\s+(?:var\.[^\n]+\?\s+)?\[(.*?)\]", text, re.DOTALL)
+    assert match is not None
+    return re.findall(r'"([^"]+)"', match.group(1))

@@ -1,0 +1,5 @@
+bootstrap_project_id = "REPLACE_WITH_BOOTSTRAP_PROJECT_ID"
+region               = "us-central1"
+state_bucket_name    = "REPLACE_WITH_GLOBALLY_UNIQUE_STATE_BUCKET"
+github_repository    = "REPLACE_OWNER/REPLACE_REPOSITORY"
+github_owner         = "REPLACE_OWNER"

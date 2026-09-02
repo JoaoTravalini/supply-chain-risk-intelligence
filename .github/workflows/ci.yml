@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Python quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v5.0.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Set up Python
+        # actions/setup-python v6.1.0
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        # astral-sh/setup-uv v7.0.0
+        uses: astral-sh/setup-uv@eb1897b8dc4b5d5bfe39a428a8f2304605e0983c
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Sync dependencies from lockfile
+        run: uv sync --locked
+
+      - name: Ruff
+        run: uv run ruff check .
+
+      - name: Ruff format
+        run: uv run ruff format --check .
+
+      - name: MyPy
+        run: uv run mypy src tests
+
+      - name: Pytest
+        env:
+          SUPPLYCHAIN_RUN_GEMINI_INTEGRATION: "0"
+          SUPPLYCHAIN_RUN_POSTGRES_INTEGRATION: "0"
+        run: uv run pytest
+
+      - name: pre-commit
+        run: uv run pre-commit run --all-files
+
+      - name: Check uv lockfile
+        run: uv lock --check
+
+      - name: Deterministic agent evaluation
+        run: uv run python -m supplychain.agent.evaluation

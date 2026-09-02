@@ -1,0 +1,82 @@
+name: Production Plan
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_project_id:
+        description: "Production runtime GCP project ID."
+        required: true
+        type: string
+      data_project_id:
+        description: "GCP project containing approved CORE/MART data."
+        required: true
+        type: string
+      region:
+        description: "Production region."
+        required: true
+        default: "us-central1"
+        type: string
+      container_image:
+        description: "Immutable container image reference, preferably a digest."
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-plan-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Manual production OpenTofu plan only
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v5.0.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Verify bootstrap configuration is present
+        env:
+          PRODUCTION_WIF_PROVIDER: ${{ vars.PRODUCTION_WIF_PROVIDER }}
+          PRODUCTION_DEPLOYER_SERVICE_ACCOUNT: ${{ vars.PRODUCTION_DEPLOYER_SERVICE_ACCOUNT }}
+          PRODUCTION_TOFU_STATE_BUCKET: ${{ vars.PRODUCTION_TOFU_STATE_BUCKET }}
+        run: |
+          test -n "$PRODUCTION_WIF_PROVIDER"
+          test -n "$PRODUCTION_DEPLOYER_SERVICE_ACCOUNT"
+          test -n "$PRODUCTION_TOFU_STATE_BUCKET"
+
+      - name: Authenticate to Google Cloud with OIDC
+        # google-github-actions/auth v3.0.0
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          workload_identity_provider: ${{ vars.PRODUCTION_WIF_PROVIDER }}
+          service_account: ${{ vars.PRODUCTION_DEPLOYER_SERVICE_ACCOUNT }}
+
+      - name: Set up OpenTofu
+        # opentofu/setup-opentofu v1.0.6
+        uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b
+        with:
+          tofu_version: "1.12.5"
+
+      - name: Initialize production state
+        run: |
+          tofu -chdir=infra/environments/production init \
+            -input=false \
+            -backend-config="bucket=${{ vars.PRODUCTION_TOFU_STATE_BUCKET }}" \
+            -backend-config="prefix=production"
+
+      - name: Create production plan
+        run: |
+          tofu -chdir=infra/environments/production plan \
+            -input=false \
+            -out=production.tfplan \
+            -var="runtime_project_id=${{ inputs.runtime_project_id }}" \
+            -var="data_project_id=${{ inputs.data_project_id }}" \
+            -var="region=${{ inputs.region }}" \
+            -var="container_image=${{ inputs.container_image }}"

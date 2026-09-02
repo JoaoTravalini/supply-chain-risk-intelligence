@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOWS = ROOT / ".github" / "workflows"
+PRODUCTION_ROOT = ROOT / "infra" / "environments" / "production"
+
+
+def test_github_actions_are_pinned_to_immutable_shas() -> None:
+    workflow_text = "\n".join(path.read_text(encoding="utf-8") for path in WORKFLOWS.glob("*.yml"))
+
+    mutable_uses = [
+        line.strip()
+        for line in workflow_text.splitlines()
+        if "uses:" in line and not re.search(r"@[0-9a-f]{40}\b", line)
+    ]
+
+    assert mutable_uses == []
+    assert "@main" not in workflow_text
+
+
+def test_production_plan_workflow_is_plan_only() -> None:
+    workflow = (WORKFLOWS / "production-plan.yml").read_text(encoding="utf-8")
+
+    assert "tofu apply" not in workflow
+    assert "workflow_dispatch" in workflow
+    assert "id-token: write" in workflow
+    assert "google-github-actions/auth@" in workflow
+    assert "service_account_key" not in workflow
+    assert "credentials_json" not in workflow
+
+
+def test_normal_ci_is_cloud_independent() -> None:
+    workflow = (WORKFLOWS / "ci.yml").read_text(encoding="utf-8")
+
+    assert "id-token: write" not in workflow
+    assert "google-github-actions/auth" not in workflow
+    assert "GEMINI_API_KEY" not in workflow
+    assert "SUPPLYCHAIN_AGENT_POSTGRES_DSN" not in workflow
+    assert "uv run python -m supplychain.agent.evaluation" in workflow
+
+
+def test_public_cloud_run_access_is_disabled_by_default() -> None:
+    variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert re.search(
+        r'variable\s+"allow_unauthenticated"\s+\{[\s\S]*?default\s+=\s+false',
+        variables,
+    )
+    assert "var.enable_cloud_run_service && var.allow_unauthenticated ? 1 : 0" in main
+
+
+def test_runtime_bigquery_iam_excludes_raw_dataset() -> None:
+    production_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in PRODUCTION_ROOT.glob("*.tf")
+    )
+
+    assert "supplychain_raw" not in production_text
+    assert "bigquery_core_dataset_id" in production_text
+    assert "bigquery_mart_dataset_id" in production_text
+    assert "runtime_core_viewer" in production_text
+    assert "runtime_mart_viewer" in production_text
+
+
+def test_tracked_production_tfvars_contain_placeholders_not_secret_values() -> None:
+    tfvars_text = "\n".join(
+        path.read_text(encoding="utf-8") for path in ROOT.glob("infra/**/terraform.tfvars.example")
+    )
+
+    forbidden = (
+        "BEGIN PRIVATE KEY",
+        "GEMINI_API_KEY=",
+        "postgresql://",
+        "service_account_key",
+        "credentials_json",
+    )
+    for token in forbidden:
+        assert token not in tfvars_text
+    assert "REPLACE_" in tfvars_text
+
+
+def test_dockerignore_excludes_credentials_state_and_non_runtime_content() -> None:
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+
+    required_patterns = (
+        ".git/",
+        ".env",
+        "**/.terraform/",
+        "*.tfstate",
+        "terraform.tfvars",
+        "*service-account*.json",
+        "tests/",
+        "docs/",
+        "infra/",
+    )
+    for pattern in required_patterns:
+        assert pattern in dockerignore

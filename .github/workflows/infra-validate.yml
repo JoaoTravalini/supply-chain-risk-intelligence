@@ -1,0 +1,57 @@
+name: Infrastructure Validate
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-validate.yml"
+      - ".github/workflows/production-plan.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "infra/**"
+      - ".github/workflows/infra-validate.yml"
+      - ".github/workflows/production-plan.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infra-validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: OpenTofu static validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        # actions/checkout v5.0.0
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+
+      - name: Set up OpenTofu
+        # opentofu/setup-opentofu v1.0.6
+        uses: opentofu/setup-opentofu@000eeb8522f0572907c393e8151076c205fdba1b
+        with:
+          tofu_version: "1.12.5"
+
+      - name: Check formatting
+        run: tofu fmt -check -recursive
+
+      - name: Validate development root
+        run: |
+          tofu -chdir=infra init -backend=false
+          tofu -chdir=infra validate
+
+      - name: Validate bootstrap root
+        run: |
+          tofu -chdir=infra/bootstrap init -backend=false
+          tofu -chdir=infra/bootstrap validate
+
+      - name: Validate production root
+        run: |
+          tofu -chdir=infra/environments/production init -backend=false
+          tofu -chdir=infra/environments/production validate

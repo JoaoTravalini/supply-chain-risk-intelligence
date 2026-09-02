@@ -1,0 +1,40 @@
+# Version control and local caches
+.git/
+.github/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.uv-cache/
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local environment, credentials, and OpenTofu state
+.env
+.env.*
+!.env.example
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.*
+*.auto.tfvars
+*.auto.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+*.json.key
+*service-account*.json
+
+# Non-runtime repository content
+data/
+docs/
+infra/
+schemas/
+tests/
+htmlcov/
+coverage.xml
+.coverage
+
+# Operating system files
+.DS_Store
+Thumbs.db

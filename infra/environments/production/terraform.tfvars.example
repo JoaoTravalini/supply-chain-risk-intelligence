@@ -1,0 +1,12 @@
+runtime_project_id = "REPLACE_WITH_RUNTIME_PROJECT_ID"
+data_project_id    = "REPLACE_WITH_DATA_PROJECT_ID"
+region             = "us-central1"
+environment        = "production"
+
+container_image = "REGION-docker.pkg.dev/PROJECT/supplychain-sentinel/app@sha256:REPLACE_WITH_DIGEST"
+
+enable_cloud_run_service = false
+allow_unauthenticated    = false
+
+enable_managed_postgres = false
+postgres_tier           = "REPLACE_AFTER_COST_REVIEW"

@@ -1,0 +1,15 @@
+terraform {
+  required_version = ">= 1.12.0, < 1.13.0"
+
+  backend "gcs" {
+    bucket = "REPLACE_WITH_BOOTSTRAPPED_STATE_BUCKET"
+    prefix = "production"
+  }
+
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = ">= 7.0, < 8.0"
+    }
+  }
+}

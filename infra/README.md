@@ -1,8 +1,17 @@
 # Infrastructure
 
-This directory contains the OpenTofu root module for SupplyChain Sentinel.
+This directory contains OpenTofu roots and reusable modules for SupplyChain Sentinel.
 
 Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. Stage 11 defines and deploys the first RAW/CORE table and view resources. Stage 12 defines and deploys MART supplier risk current/history resources after human review of the saved Stage 12 OpenTofu plan.
+
+Stage 19A adds reviewable production preparation without changing the existing development state boundary:
+
+- `infra/`: existing development root for BigQuery RAW/CORE/MART resources.
+- `infra/bootstrap/`: one-time privileged production bootstrap root.
+- `infra/environments/production/`: production runtime infrastructure root.
+- `infra/modules/`: focused reusable production modules.
+
+Do not run `tofu apply` for Stage 19A. Bootstrap and production deployment are deferred to Stage 19B after explicit human approval.
 
 ## Requirements
 
@@ -75,11 +84,11 @@ Use a real project ID only in local, ignored files. Do not commit developer-spec
 
 ## State Strategy
 
-No remote backend is configured in Stage 4.
+No remote backend is configured for the existing development root.
 
 If local state is ever created during billing-free development, it is temporary and must not be committed. OpenTofu state may contain sensitive information.
 
-A remote backend with locking and access control must be evaluated before shared or production infrastructure is introduced. Remote-state migration is deferred.
+The production root is designed for a separate GCS remote backend created by the bootstrap root. Bootstrap is a privileged one-time operation, and production state initialization/migration is documented in `docs/deployment/runbook.md`. Do not point the existing development root at the production backend.
 
 ## Security Rules
 
@@ -105,3 +114,15 @@ tofu providers
 These commands are non-mutating with respect to cloud resources. `tofu init` may create local `.terraform/` files and `.terraform.lock.hcl`; `.terraform/` is ignored and `.terraform.lock.hcl` is versioned.
 
 Do not run `tofu apply` as a validation command. Future applies require explicit human review of the exact saved plan to be applied.
+
+Stage 19A validation for all roots:
+
+```bash
+tofu fmt -check -recursive
+tofu -chdir=infra init -backend=false
+tofu -chdir=infra validate
+tofu -chdir=infra/bootstrap init -backend=false
+tofu -chdir=infra/bootstrap validate
+tofu -chdir=infra/environments/production init -backend=false
+tofu -chdir=infra/environments/production validate
+```

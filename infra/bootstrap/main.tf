@@ -93,8 +93,6 @@ resource "google_storage_bucket_iam_member" "deployer_state_access" {
 resource "google_project_iam_member" "deployer_roles" {
   for_each = toset([
     "roles/artifactregistry.admin",
-    "roles/bigquery.jobUser",
-    "roles/cloudsql.admin",
     "roles/iam.serviceAccountAdmin",
     "roles/iam.serviceAccountUser",
     "roles/pubsub.admin",

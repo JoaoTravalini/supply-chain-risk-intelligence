@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOWS = ROOT / ".github" / "workflows"
 PRODUCTION_ROOT = ROOT / "infra" / "environments" / "production"
+BOOTSTRAP_ROOT = ROOT / "infra" / "bootstrap"
 
 
 def test_github_actions_are_pinned_to_immutable_shas() -> None:
@@ -40,6 +41,41 @@ def test_normal_ci_is_cloud_independent() -> None:
     assert "GEMINI_API_KEY" not in workflow
     assert "SUPPLYCHAIN_AGENT_POSTGRES_DSN" not in workflow
     assert "uv run python -m supplychain.agent.evaluation" in workflow
+
+
+def test_bootstrap_deployer_account_id_uses_valid_safe_default() -> None:
+    variables = (BOOTSTRAP_ROOT / "variables.tf").read_text(encoding="utf-8")
+    match = re.search(
+        r'variable\s+"deployer_service_account_id"\s+\{[\s\S]*?default\s+=\s+"([^"]+)"',
+        variables,
+    )
+    assert match is not None
+
+    account_id = match.group(1)
+    assert account_id == "supplychain-prod-deployer"
+    assert account_id[0].isalpha()
+    assert account_id == account_id.lower()
+    assert re.fullmatch(r"[a-z][a-z0-9-]{4,28}[a-z0-9]", account_id)
+    assert 6 <= len(account_id) <= 30
+
+
+def test_bootstrap_deployer_roles_match_initial_dashboard_first_scope() -> None:
+    main = (BOOTSTRAP_ROOT / "main.tf").read_text(encoding="utf-8")
+    roles = set(_resource_role_list(main, "google_project_iam_member", "deployer_roles"))
+
+    assert roles == {
+        "roles/artifactregistry.admin",
+        "roles/iam.serviceAccountAdmin",
+        "roles/iam.serviceAccountUser",
+        "roles/pubsub.admin",
+        "roles/run.admin",
+        "roles/secretmanager.admin",
+        "roles/serviceusage.serviceUsageAdmin",
+    }
+    assert "roles/cloudsql.admin" not in roles
+    assert "roles/bigquery.jobUser" not in roles
+    assert "roles/owner" not in roles
+    assert "roles/editor" not in roles
 
 
 def test_public_cloud_run_access_is_disabled_by_default() -> None:
@@ -135,5 +171,15 @@ def test_dockerignore_excludes_credentials_state_and_non_runtime_content() -> No
 
 def _local_list(text: str, name: str) -> list[str]:
     match = re.search(rf"{name}\s+=\s+(?:var\.[^\n]+\?\s+)?\[(.*?)\]", text, re.DOTALL)
+    assert match is not None
+    return re.findall(r'"([^"]+)"', match.group(1))
+
+
+def _resource_role_list(text: str, resource_type: str, resource_name: str) -> list[str]:
+    match = re.search(
+        rf'resource\s+"{resource_type}"\s+"{resource_name}"\s+\{{[\s\S]*?for_each\s+=\s+toset\(\[(.*?)\]\)',
+        text,
+        re.DOTALL,
+    )
     assert match is not None
     return re.findall(r'"([^"]+)"', match.group(1))

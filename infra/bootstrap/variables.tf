@@ -53,7 +53,7 @@ variable "github_production_environment" {
 variable "deployer_service_account_id" {
   description = "Account ID for the production deployment service account."
   type        = string
-  default     = "supplychain-production-deployer"
+  default     = "supplychain-prod-deployer"
 }
 
 variable "workload_identity_pool_id" {

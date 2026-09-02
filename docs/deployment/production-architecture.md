@@ -68,6 +68,12 @@ The bootstrap root models:
   future deployment;
 - access to the remote-state bucket.
 
+For the dashboard-first bootstrap scope, the deployer identity is not
+granted Cloud SQL administration or BigQuery job execution. Cloud SQL
+administration is deferred until managed PostgreSQL is explicitly
+approved, and BigQuery job execution belongs to the runtime application
+identity.
+
 The intended trust chain is:
 
 ```text

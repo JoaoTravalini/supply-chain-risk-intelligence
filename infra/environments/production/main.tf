@@ -10,12 +10,18 @@ locals {
     "bigquery.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
-    "pubsub.googleapis.com",
     "run.googleapis.com",
-    "secretmanager.googleapis.com",
     "serviceusage.googleapis.com",
     "sts.googleapis.com",
   ]
+
+  pubsub_services = var.enable_pubsub_topology ? [
+    "pubsub.googleapis.com",
+  ] : []
+
+  agent_runtime_services = var.enable_agent_runtime ? [
+    "secretmanager.googleapis.com",
+  ] : []
 
   managed_postgres_services = var.enable_managed_postgres ? [
     "sqladmin.googleapis.com",
@@ -23,6 +29,8 @@ locals {
 
   production_services = toset(concat(
     local.base_production_services,
+    local.pubsub_services,
+    local.agent_runtime_services,
     local.managed_postgres_services,
   ))
 
@@ -30,9 +38,23 @@ locals {
     SUPPLYCHAIN_GCP_PROJECT_ID                  = var.data_project_id
     SUPPLYCHAIN_ENVIRONMENT                     = var.environment
     SUPPLYCHAIN_SERVICE_NAME                    = var.service_name
-    SUPPLYCHAIN_GEMINI_MODEL                    = var.gemini_model
     SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED = tostring(var.agent_bigquery_max_bytes_billed)
   }
+
+  agent_non_secret_environment = var.enable_agent_runtime ? {
+    SUPPLYCHAIN_GEMINI_MODEL = var.gemini_model
+  } : {}
+
+  agent_secret_environment = var.enable_agent_runtime ? {
+    GEMINI_API_KEY = {
+      secret  = google_secret_manager_secret.gemini_api_key[0].secret_id
+      version = "latest"
+    }
+    SUPPLYCHAIN_AGENT_POSTGRES_DSN = {
+      secret  = google_secret_manager_secret.agent_postgres_dsn[0].secret_id
+      version = "latest"
+    }
+  } : {}
 
   cloud_sql_instances = var.enable_managed_postgres ? [google_sql_database_instance.agent[0].connection_name] : []
 }
@@ -64,6 +86,8 @@ resource "google_service_account" "runtime" {
 }
 
 resource "google_secret_manager_secret" "gemini_api_key" {
+  count = var.enable_agent_runtime ? 1 : 0
+
   project   = var.runtime_project_id
   secret_id = "supplychain-gemini-api-key"
 
@@ -75,6 +99,8 @@ resource "google_secret_manager_secret" "gemini_api_key" {
 }
 
 resource "google_secret_manager_secret" "agent_postgres_dsn" {
+  count = var.enable_agent_runtime ? 1 : 0
+
   project   = var.runtime_project_id
   secret_id = "supplychain-agent-postgres-dsn"
 
@@ -114,6 +140,8 @@ resource "google_sql_database_instance" "agent" {
 }
 
 module "pubsub_topology" {
+  count = var.enable_pubsub_topology ? 1 : 0
+
   source = "../../modules/pubsub-topology"
 
   project_id                    = var.runtime_project_id
@@ -146,15 +174,19 @@ resource "google_bigquery_dataset_iam_member" "runtime_mart_viewer" {
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_gemini_secret_accessor" {
+  count = var.enable_agent_runtime ? 1 : 0
+
   project   = var.runtime_project_id
-  secret_id = google_secret_manager_secret.gemini_api_key.secret_id
+  secret_id = google_secret_manager_secret.gemini_api_key[0].secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
 
 resource "google_secret_manager_secret_iam_member" "runtime_postgres_secret_accessor" {
+  count = var.enable_agent_runtime ? 1 : 0
+
   project   = var.runtime_project_id
-  secret_id = google_secret_manager_secret.agent_postgres_dsn.secret_id
+  secret_id = google_secret_manager_secret.agent_postgres_dsn[0].secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime.email}"
 }
@@ -184,18 +216,8 @@ module "streamlit_service" {
   max_instances                 = var.cloud_run_max_instances
   cloud_sql_instances           = local.cloud_sql_instances
 
-  environment_variables = local.non_secret_environment
-
-  secret_environment_variables = {
-    GEMINI_API_KEY = {
-      secret  = google_secret_manager_secret.gemini_api_key.secret_id
-      version = "latest"
-    }
-    SUPPLYCHAIN_AGENT_POSTGRES_DSN = {
-      secret  = google_secret_manager_secret.agent_postgres_dsn.secret_id
-      version = "latest"
-    }
-  }
+  environment_variables        = merge(local.non_secret_environment, local.agent_non_secret_environment)
+  secret_environment_variables = local.agent_secret_environment
 
   depends_on = [google_project_service.production]
 }

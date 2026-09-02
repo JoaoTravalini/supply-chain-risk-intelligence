@@ -44,6 +44,12 @@ The workflow receives explicit runtime/data project IDs, region, and an
 immutable image reference. It runs `tofu plan`; it does not run
 `tofu apply`.
 
+The first production foundation is dashboard-first: Risk Portfolio and
+Supplier Explorer over guarded CORE/MART BigQuery reads. Keep
+`enable_pubsub_topology=false`, `enable_agent_runtime=false`, and
+`enable_managed_postgres=false` until event processing, AI
+investigation/HITL, and managed PostgreSQL are separately reviewed.
+
 ## Phase 3: Secret Seeding
 
 Secret Manager secret containers are modeled by OpenTofu, but secret
@@ -65,8 +71,9 @@ rebuilding the image.
 ## Phase 4: Application Deployment
 
 Build and push an immutable image only after explicit approval. The
-runtime service account reads CORE/MART data, Pub/Sub, exact secrets, and
-PostgreSQL as configured. It does not receive RAW BigQuery access.
+runtime service account reads CORE/MART data. Pub/Sub, exact secrets,
+and PostgreSQL are added only when their production feature gates are
+enabled. It does not receive RAW BigQuery access.
 
 Cloud Run public access remains disabled unless
 `allow_unauthenticated=true` is explicitly reviewed and approved.

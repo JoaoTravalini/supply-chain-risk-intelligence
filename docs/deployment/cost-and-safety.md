@@ -28,6 +28,8 @@ The production root uses safety-first defaults:
 - public access disabled;
 - Cloud Run minimum instances set to zero;
 - finite maximum instances;
+- production Pub/Sub topology disabled;
+- production agent/HITL runtime infrastructure disabled;
 - managed PostgreSQL disabled;
 - Cloud SQL deletion protection enabled when created;
 - Cloud SQL Admin API enabled only when managed PostgreSQL is explicitly
@@ -35,10 +37,12 @@ The production root uses safety-first defaults:
 - no secret versions or values in OpenTofu;
 - no RAW BigQuery access for the runtime identity.
 
-The dashboard-first initial deployment does not require Cloud SQL or the
-Cloud SQL Admin API. Persistent LangGraph investigation and HITL
-production capability remains deferred until managed PostgreSQL is
-approved.
+The dashboard-first initial deployment supports Risk Portfolio and
+Supplier Explorer over guarded CORE/MART BigQuery reads. It does not
+require Pub/Sub, Gemini secrets, PostgreSQL DSN secrets, Cloud SQL, or
+the Cloud SQL Admin API. Persistent LangGraph investigation and HITL
+production capability remains deferred until agent runtime and
+PostgreSQL decisions are explicitly approved.
 
 ## Billing Boundary
 

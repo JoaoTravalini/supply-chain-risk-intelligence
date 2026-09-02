@@ -102,6 +102,51 @@ def test_cloud_run_deployment_and_min_instances_are_safe_by_default() -> None:
     )
 
 
+def test_pubsub_topology_is_disabled_by_default_and_gates_api_and_resources() -> None:
+    variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert re.search(
+        r'variable\s+"enable_pubsub_topology"\s+\{[\s\S]*?default\s+=\s+false',
+        variables,
+    )
+    assert "pubsub_services = var.enable_pubsub_topology ? [" in main
+    assert '"pubsub.googleapis.com"' in _local_block(main, "pubsub_services")
+    assert '"pubsub.googleapis.com"' not in _local_block(main, "base_production_services")
+    assert 'module "pubsub_topology"' in main
+    assert "count = var.enable_pubsub_topology ? 1 : 0" in main
+    assert "local.pubsub_services" in main
+
+
+def test_agent_runtime_is_disabled_by_default_and_gates_secrets() -> None:
+    variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert re.search(
+        r'variable\s+"enable_agent_runtime"\s+\{[\s\S]*?default\s+=\s+false',
+        variables,
+    )
+    assert "agent_runtime_services = var.enable_agent_runtime ? [" in main
+    assert '"secretmanager.googleapis.com"' in _local_block(main, "agent_runtime_services")
+    assert '"secretmanager.googleapis.com"' not in _local_block(main, "base_production_services")
+    assert 'resource "google_secret_manager_secret" "gemini_api_key"' in main
+    assert 'resource "google_secret_manager_secret" "agent_postgres_dsn"' in main
+    assert main.count("count = var.enable_agent_runtime ? 1 : 0") >= 4
+    assert "google_secret_manager_secret.gemini_api_key[0].secret_id" in main
+    assert "google_secret_manager_secret.agent_postgres_dsn[0].secret_id" in main
+
+
+def test_cloud_run_can_be_enabled_without_agent_runtime_or_managed_postgres() -> None:
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert "count = var.enable_cloud_run_service ? 1 : 0" in main
+    assert "enable_cloud_run_service && var.enable_agent_runtime" not in main
+    assert "enable_cloud_run_service && var.enable_managed_postgres" not in main
+    assert "secret_environment_variables = local.agent_secret_environment" in main
+    assert "environment_variables        = merge(" in main
+    assert re.search(r"cloud_sql_instances\s+=\s+local\.cloud_sql_instances", main)
+
+
 def test_cloud_sql_admin_api_is_gated_by_managed_postgres_flag() -> None:
     main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
     base_services = _local_list(main, "base_production_services")
@@ -128,10 +173,13 @@ def test_runtime_bigquery_iam_excludes_raw_dataset() -> None:
     )
 
     assert "supplychain_raw" not in production_text
+    assert 'resource "google_project_iam_member" "runtime_bigquery_job_user"' in production_text
+    assert 'role    = "roles/bigquery.jobUser"' in production_text
     assert "bigquery_core_dataset_id" in production_text
     assert "bigquery_mart_dataset_id" in production_text
     assert "runtime_core_viewer" in production_text
     assert "runtime_mart_viewer" in production_text
+    assert production_text.count('role       = "roles/bigquery.dataViewer"') == 2
 
 
 def test_tracked_production_tfvars_contain_placeholders_not_secret_values() -> None:
@@ -173,6 +221,12 @@ def _local_list(text: str, name: str) -> list[str]:
     match = re.search(rf"{name}\s+=\s+(?:var\.[^\n]+\?\s+)?\[(.*?)\]", text, re.DOTALL)
     assert match is not None
     return re.findall(r'"([^"]+)"', match.group(1))
+
+
+def _local_block(text: str, name: str) -> str:
+    match = re.search(rf"{name}\s+=\s+(?:var\.[^\n]+\?\s+)?\[(.*?)\]", text, re.DOTALL)
+    assert match is not None
+    return match.group(1)
 
 
 def _resource_role_list(text: str, resource_type: str, resource_name: str) -> list[str]:

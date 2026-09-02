@@ -7,6 +7,8 @@ container_image = "REGION-docker.pkg.dev/PROJECT/supplychain-sentinel/app@sha256
 
 enable_cloud_run_service = false
 allow_unauthenticated    = false
+enable_pubsub_topology   = false
+enable_agent_runtime     = false
 
 enable_managed_postgres = false
 postgres_tier           = "REPLACE_AFTER_COST_REVIEW"

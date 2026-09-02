@@ -94,8 +94,10 @@ Runtime access is intentionally narrow:
 - BigQuery job execution in the runtime project;
 - read access to configured CORE and MART datasets only;
 - no RAW dataset access;
-- access to exact runtime Secret Manager secret containers;
-- Pub/Sub publisher/subscriber access for the modeled topology;
+- access to exact runtime Secret Manager secret containers only when
+  agent runtime infrastructure is enabled;
+- Pub/Sub publisher/subscriber access only when the production Pub/Sub
+  topology is enabled;
 - Cloud SQL client permission only when managed PostgreSQL is enabled.
 
 The runtime service account does not receive Artifact Registry write
@@ -108,27 +110,35 @@ The production root models:
 - prerequisite service APIs;
 - Artifact Registry repository for Docker images;
 - runtime service account;
-- Secret Manager secret containers without secret versions;
+- optional Secret Manager secret containers without secret versions for
+  the agent/HITL runtime;
 - optional Cloud SQL PostgreSQL for LangGraph checkpoint persistence;
-- Pub/Sub canonical topic, processing subscription, dead-letter topic,
-  and inspection subscription;
+- optional Pub/Sub canonical topic, processing subscription, dead-letter
+  topic, and inspection subscription;
 - CORE/MART BigQuery dataset IAM for the runtime identity;
 - optionally gated Cloud Run service deployment.
 
 Cloud Run deployment is gated by `enable_cloud_run_service`, which
-defaults to `false`. Managed PostgreSQL is gated by
-`enable_managed_postgres`, which also defaults to `false`. The Cloud SQL
-Admin API is included only when managed PostgreSQL is explicitly enabled.
-The dashboard-first initial deployment path does not require Cloud SQL.
+defaults to `false`. Production event processing is gated by
+`enable_pubsub_topology`, and AI investigation/HITL runtime
+infrastructure is gated by `enable_agent_runtime`; both default to
+`false` for the dashboard-first deployment. Managed PostgreSQL is gated
+by `enable_managed_postgres`, which also defaults to `false`. The Cloud
+SQL Admin API is included only when managed PostgreSQL is explicitly
+enabled. The dashboard-first initial deployment path does not require
+Pub/Sub, Secret Manager agent secrets, Cloud SQL, or the Cloud SQL Admin
+API.
 
 ## Deployment Phases
 
 Production deployment is intentionally split:
 
 1. Foundation: APIs, state bucket, WIF, Artifact Registry, identities,
-   Pub/Sub, secret containers, and optionally Cloud SQL after cost review.
-   With the dashboard-first strategy and `enable_managed_postgres=false`,
-   Cloud SQL and the Cloud SQL Admin API remain out of scope.
+   and CORE/MART BigQuery read access for the runtime identity. With the
+   dashboard-first strategy, `enable_pubsub_topology=false`,
+   `enable_agent_runtime=false`, and `enable_managed_postgres=false`,
+   Pub/Sub, agent secret containers, Cloud SQL, and the Cloud SQL Admin
+   API remain out of scope.
 2. Secret seeding: human-approved Secret Manager versions for credentials
    and connection strings. Secret values never enter Git, workflows,
    Docker layers, OpenTofu source, or example tfvars.

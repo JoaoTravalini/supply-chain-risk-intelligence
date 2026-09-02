@@ -45,6 +45,18 @@ variable "enable_cloud_run_service" {
   default     = false
 }
 
+variable "enable_pubsub_topology" {
+  description = "Gate for production canonical-event Pub/Sub topology. Keep false for dashboard-first deployment."
+  type        = bool
+  default     = false
+}
+
+variable "enable_agent_runtime" {
+  description = "Gate for production AI investigation and HITL runtime infrastructure. Keep false for dashboard-first deployment."
+  type        = bool
+  default     = false
+}
+
 variable "allow_unauthenticated" {
   description = "Whether to grant allUsers Cloud Run invoker access. Safe default is false."
   type        = bool

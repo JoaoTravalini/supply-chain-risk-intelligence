@@ -15,32 +15,32 @@ output "runtime_service_account_email" {
 
 output "canonical_events_topic_name" {
   description = "Canonical events topic name."
-  value       = module.pubsub_topology.canonical_events_topic_name
+  value       = var.enable_pubsub_topology ? module.pubsub_topology[0].canonical_events_topic_name : null
 }
 
 output "processing_subscription_name" {
   description = "Canonical event processing subscription name."
-  value       = module.pubsub_topology.processing_subscription_name
+  value       = var.enable_pubsub_topology ? module.pubsub_topology[0].processing_subscription_name : null
 }
 
 output "dead_letter_topic_name" {
   description = "Dead-letter topic name."
-  value       = module.pubsub_topology.dead_letter_topic_name
+  value       = var.enable_pubsub_topology ? module.pubsub_topology[0].dead_letter_topic_name : null
 }
 
 output "dead_letter_inspection_subscription_name" {
   description = "Dead-letter inspection subscription name."
-  value       = module.pubsub_topology.dead_letter_inspection_subscription_name
+  value       = var.enable_pubsub_topology ? module.pubsub_topology[0].dead_letter_inspection_subscription_name : null
 }
 
 output "gemini_secret_id" {
   description = "Gemini API key secret container ID. No secret value is output."
-  value       = google_secret_manager_secret.gemini_api_key.secret_id
+  value       = var.enable_agent_runtime ? google_secret_manager_secret.gemini_api_key[0].secret_id : null
 }
 
 output "agent_postgres_dsn_secret_id" {
   description = "Agent PostgreSQL DSN secret container ID. No secret value is output."
-  value       = google_secret_manager_secret.agent_postgres_dsn.secret_id
+  value       = var.enable_agent_runtime ? google_secret_manager_secret.agent_postgres_dsn[0].secret_id : null
 }
 
 output "cloud_sql_connection_name" {

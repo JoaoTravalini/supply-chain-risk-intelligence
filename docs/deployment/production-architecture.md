@@ -54,6 +54,11 @@ one-time local or administrator-run operation, followed by explicit
 state migration/initialization for the production root. No remote backend
 is initialized against GCP during Stage 19A validation.
 
+Bootstrap is the single OpenTofu owner for platform API enablements that
+support state, IAM, and Workload Identity Federation. Production state
+owns only application-specific service enablements. The same Google API
+enablement must not be independently managed by both states.
+
 ## Workload Identity Federation
 
 Production CI/CD is designed to use GitHub OIDC and Workload Identity
@@ -107,7 +112,7 @@ permissions.
 
 The production root models:
 
-- prerequisite service APIs;
+- application-specific service APIs;
 - Artifact Registry repository for Docker images;
 - runtime service account;
 - optional Secret Manager secret containers without secret versions for

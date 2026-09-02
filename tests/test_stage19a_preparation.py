@@ -102,6 +102,39 @@ def test_cloud_run_deployment_and_min_instances_are_safe_by_default() -> None:
     )
 
 
+def test_bootstrap_and_production_api_ownership_sets_are_disjoint() -> None:
+    bootstrap = (BOOTSTRAP_ROOT / "main.tf").read_text(encoding="utf-8")
+    production = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    bootstrap_services = set(_local_list(bootstrap, "bootstrap_services"))
+    production_services = set(_local_list(production, "base_production_services"))
+
+    assert bootstrap_services == {
+        "iam.googleapis.com",
+        "iamcredentials.googleapis.com",
+        "serviceusage.googleapis.com",
+        "sts.googleapis.com",
+        "storage.googleapis.com",
+    }
+    assert production_services == {
+        "artifactregistry.googleapis.com",
+        "bigquery.googleapis.com",
+        "run.googleapis.com",
+    }
+    assert bootstrap_services.isdisjoint(production_services)
+
+
+def test_production_does_not_own_bootstrap_platform_apis() -> None:
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+    production_services = set(_local_list(main, "base_production_services"))
+
+    assert "iam.googleapis.com" not in production_services
+    assert "iamcredentials.googleapis.com" not in production_services
+    assert "serviceusage.googleapis.com" not in production_services
+    assert "storage.googleapis.com" not in production_services
+    assert "sts.googleapis.com" not in production_services
+
+
 def test_pubsub_topology_is_disabled_by_default_and_gates_api_and_resources() -> None:
     variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
     main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
@@ -218,7 +251,11 @@ def test_dockerignore_excludes_credentials_state_and_non_runtime_content() -> No
 
 
 def _local_list(text: str, name: str) -> list[str]:
-    match = re.search(rf"{name}\s+=\s+(?:var\.[^\n]+\?\s+)?\[(.*?)\]", text, re.DOTALL)
+    match = re.search(
+        rf"{name}\s+=\s+(?:toset\()?(?:var\.[^\n]+\?\s+)?\[(.*?)\]",
+        text,
+        re.DOTALL,
+    )
     assert match is not None
     return re.findall(r'"([^"]+)"', match.group(1))
 

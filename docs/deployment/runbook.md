@@ -17,6 +17,9 @@ steps until cloud bootstrap/deployment is explicitly approved.
 
 Bootstrap creates privileged prerequisites such as the remote-state
 bucket and GitHub Workload Identity Federation.
+It is also the single OpenTofu owner for platform API enablements needed
+by state, IAM, and Workload Identity Federation. Do not duplicate those
+API resources in the production root.
 
 ```shell
 cd infra/bootstrap
@@ -43,6 +46,8 @@ a service-account JSON key.
 The workflow receives explicit runtime/data project IDs, region, and an
 immutable image reference. It runs `tofu plan`; it does not run
 `tofu apply`.
+Production state owns application-specific service enablements only; APIs
+already managed by bootstrap remain bootstrap-owned and enabled.
 
 The first production foundation is dashboard-first: Risk Portfolio and
 Supplier Explorer over guarded CORE/MART BigQuery reads. Keep

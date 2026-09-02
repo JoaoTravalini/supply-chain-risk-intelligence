@@ -8,11 +8,7 @@ locals {
   base_production_services = [
     "artifactregistry.googleapis.com",
     "bigquery.googleapis.com",
-    "iam.googleapis.com",
-    "iamcredentials.googleapis.com",
     "run.googleapis.com",
-    "serviceusage.googleapis.com",
-    "sts.googleapis.com",
   ]
 
   pubsub_services = var.enable_pubsub_topology ? [

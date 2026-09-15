@@ -1,9 +1,12 @@
-# Production Architecture Preparation
+# Production Architecture
 
-Stage 19A defines the production deployment shape without executing it.
-No billing, IAM, API, Pub/Sub, BigQuery, Secret Manager, Cloud SQL,
-Artifact Registry, Cloud Run, Workload Identity Federation, or OpenTofu
-apply operation is performed by this stage.
+Production is intentionally dashboard-first. The controlled Stage 19B
+deployment created the production runtime project foundation, Workload
+Identity Federation, Artifact Registry, runtime identity, CORE/MART
+BigQuery access, and a private Cloud Run Streamlit dashboard. Agent
+runtime, managed PostgreSQL, production Pub/Sub topology, Secret Manager
+AI secrets, and remote telemetry exporters remain gated for later
+explicit approval.
 
 ## Deployment Flow
 
@@ -38,9 +41,9 @@ flowchart TD
 
 ## State Boundaries
 
-The existing `infra/` root remains the development state boundary and
-continues to manage the current BigQuery development resources. Stage 19A
-does not rename, move, import, or refactor those resources.
+The existing `infra/` root remains the development/data state boundary
+and continues to manage the current BigQuery RAW/CORE/MART resources. It
+was not renamed, moved, imported into production, or refactored.
 
 Production uses separate roots:
 
@@ -48,11 +51,9 @@ Production uses separate roots:
 - `infra/environments/production/`: normal production infrastructure.
 - `infra/modules/`: focused reusable modules for Cloud Run and Pub/Sub.
 
-The production root is configured for a GCS backend, but the bucket is
-created by the bootstrap root. Bootstrap is therefore a deliberate
-one-time local or administrator-run operation, followed by explicit
-state migration/initialization for the production root. No remote backend
-is initialized against GCP during Stage 19A validation.
+The production root is configured for a GCS backend created by the
+bootstrap root. Bootstrap is a deliberate one-time administrator-run
+operation, and production state is separate from development state.
 
 Bootstrap is the single OpenTofu owner for platform API enablements that
 support state, IAM, and Workload Identity Federation. Production state
@@ -135,15 +136,15 @@ The production root models:
 - optionally gated Cloud Run service deployment.
 
 Cloud Run deployment is gated by `enable_cloud_run_service`, which
-defaults to `false`. Production event processing is gated by
+defaults to `false` in source even though the reviewed production apply
+enabled it for the dashboard. Production event processing is gated by
 `enable_pubsub_topology`, and AI investigation/HITL runtime
 infrastructure is gated by `enable_agent_runtime`; both default to
 `false` for the dashboard-first deployment. Managed PostgreSQL is gated
 by `enable_managed_postgres`, which also defaults to `false`. The Cloud
 SQL Admin API is included only when managed PostgreSQL is explicitly
-enabled. The dashboard-first initial deployment path does not require
-Pub/Sub, Secret Manager agent secrets, Cloud SQL, or the Cloud SQL Admin
-API.
+enabled. The dashboard-first deployment path does not require Pub/Sub,
+Secret Manager agent secrets, Cloud SQL, or the Cloud SQL Admin API.
 
 ## Deployment Phases
 
@@ -187,8 +188,8 @@ investigations in production.
 
 Stage 18 structured JSON stdout logs remain the default production log
 path, which Cloud Run can collect naturally. OpenTelemetry traces and
-metrics remain instrumented, but no remote telemetry exporter is added in
-Stage 19A. Exporter selection belongs to the later deployment stage.
+metrics remain instrumented, but no remote telemetry exporter is deployed
+by default. Exporter selection remains gated.
 
 ## Rollback
 

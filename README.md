@@ -4,9 +4,11 @@ SupplyChain Sentinel is a production-oriented portfolio project for cloud-native
 
 ## Current Status
 
-The project has completed implementation for **Stage 19A: CI/CD + Containerization + Production IaC Preparation**. Stage 0 established the target architecture, Stage 1 established the minimal Python package bootstrap, Stage 2 established local quality tooling, Stage 3 documented the billing-free Google Cloud bootstrap, Stage 4 established the OpenTofu foundation, Stage 5 established the BigQuery data architecture, Stage 6 introduced the Canonical Event v1 contract, Stage 7 introduced the Supplier v1 domain contract plus deterministic synthetic Supplier data, Stage 8A introduced the reusable external HTTP boundary, Stage 8B introduced the Open-Meteo weather adapter, Stage 8C introduced the USGS seismic adapter, Stage 9 introduced the local Pub/Sub messaging pipeline, Stage 10 introduced processing idempotency/failure policy, Stage 11 deployed the Sandbox-compatible RAW/CORE BigQuery pipeline after human approval of the saved OpenTofu plan, Stage 12 deployed the MART risk current/history tables after human approval of the saved OpenTofu plan, Stage 13 introduced a real minimal LangGraph investigation graph with PostgreSQL-backed checkpoint persistence, Stage 14 introduced allowlisted read-only BigQuery agent data tools with SQL and cost guardrails, Stage 15 connected the durable workflow to guarded CORE/MART retrieval and Gemini structured analysis, Stage 16 added deterministic report validation, native LangGraph human review, and offline deterministic agent evaluations, Stage 17 added the Streamlit presentation layer for portfolio risk, Supplier inspection, AI investigation, and human review, Stage 18 added vendor-neutral observability, and Stage 19A added cloud-independent CI, production containerization, and reviewable production OpenTofu preparation.
+The project is in **Stage 20: Final Integration + Audit**. Stages 0-19 implemented the target architecture, local quality tooling, BigQuery RAW/CORE/MART data platform, canonical events, Supplier domain model, external adapters, local Pub/Sub transport, idempotent processing and DLQ semantics, deployed development BigQuery warehouse objects, deterministic Supplier Risk Model v1, LangGraph investigation runtime, guarded BigQuery agent reads, Gemini-backed structured investigation boundary, deterministic validation, native human review, offline agent evaluations, Streamlit application, vendor-neutral observability, cloud-independent CI/CD, containerization, OpenTofu production infrastructure, and a dashboard-first Cloud Run deployment.
 
-The repository now contains the minimal Python package scaffold, local quality tooling, project metadata, lockfile support, a bootstrap import test, billing-free Google Cloud bootstrap documentation, an OpenTofu root module foundation, BigQuery Sandbox RAW/CORE/MART datasets managed by OpenTofu, the Canonical Event v1 contract, the Supplier v1 master-data contract, a deterministic synthetic Supplier dataset, a reusable synchronous HTTP boundary, Open-Meteo and USGS adapters that canonicalize provider observations into Canonical Events, local-emulator-only Pub/Sub publisher and pull-consumer transport, processing idempotency/revision/failure policy, local native Pub/Sub DLQ topology, deployed BigQuery RAW/CORE table/view definitions, a batch-load warehouse runtime boundary, the deterministic Supplier Risk Model v1 with deployed MART current/history tables, the Stage 13 LangGraph investigation runtime with local PostgreSQL checkpoint support, the Stage 14 guarded BigQuery read boundary, the Stage 15 bounded investigation workflow with Gemini structured output validation, the Stage 16 validation/HITL/evaluation layer, the Stage 17 Streamlit application, the Stage 18 observability runtime, GitHub Actions quality/infra validation workflows, a production Streamlit container, and unapplied production OpenTofu bootstrap/production roots. Billing remains disabled, Sandbox 60-day table and partition expiration is represented explicitly in development IaC, the Supplier snapshot was loaded for validation, one synthetic CanonicalEvent was appended to RAW for validation, and one full 120-Supplier Stage 12 assessment batch was loaded to MART for validation. Stage 15 implementation is complete, and BigQuery/LangGraph/PostgreSQL integration reached the Gemini boundary; a provider-independent minimal text-only Gemini diagnostic reproduced the external capability blocker without Supplier or project context. Live Gemini provider validation must be repeated once provider/key capability is restored. Live environmental factors depend on available CORE evidence; production bootstrap, production apply/deployment, production scheduling, DLQ consumption/replay operations, and telemetry exporter deployment remain deferred.
+The production deployment is intentionally dashboard-first. The deployed Cloud Run service runs a frozen immutable Streamlit image in the runtime project `sc-sentinel-prod-7h2k9q`, remains private through IAM, accepts authenticated `run.app` access, uses request-based CPU allocation with minimum instances set to zero, and reads approved CORE/MART BigQuery data from the separate data project `supplychain-sentinel-646511`. Runtime BigQuery jobs execute in the runtime project; data reads remain fully qualified to the data project. The deployed dashboard and Supplier Explorer have rendered real BigQuery data. RAW access, public unauthenticated access, production Pub/Sub topology, managed PostgreSQL, Gemini runtime secrets, production AI investigation/HITL runtime, production scheduling, DLQ replay operations, and remote telemetry exporters remain intentionally gated.
+
+The Stage 15 agent implementation is complete, and BigQuery/LangGraph/PostgreSQL integration reached the Gemini boundary; a provider-independent minimal text-only Gemini diagnostic reproduced the external provider/key capability blocker without Supplier or project context. Live Gemini provider validation must be repeated once provider/key capability is restored. Live environmental factors depend on qualifying CORE evidence.
 
 ## Project Goals
 
@@ -28,7 +30,7 @@ The LLM explains evidence and supports investigation. It does not define authori
 
 The project favors deterministic business logic, explicit system boundaries, cloud-native deployment practices, least-privilege security, structured observability, cost-aware operation, and tests that keep business logic independent from infrastructure.
 
-During the current development phase, no Cloud Billing Account is linked to the Google Cloud project. Development starts with billing-free or local paths such as BigQuery Sandbox when introduced, local Pub/Sub emulation when introduced, and local execution for application services.
+The original development/data project remains billing-disabled. The separate production runtime project is billed only for explicitly approved production runtime resources and uses conservative cost controls such as Cloud Run scale-to-zero, request-based CPU allocation, bounded maximum instances, and BigQuery byte limits. The repository does not claim absolute zero production cost.
 
 Canonical local quality checks are:
 
@@ -53,19 +55,19 @@ Local observability is application-owned and vendor-neutral. Logs are structured
 
 Telemetry tests use in-memory OpenTelemetry exporters/readers and captured JSON logs, so the observability contract is validated without a collector, cloud service, internet access, or live Gemini request.
 
-## CI and Deployment Preparation
+## CI and Production Deployment
 
 GitHub Actions CI validates repository quality from the lockfile without cloud credentials. The normal CI path runs Ruff, Ruff format, MyPy, Pytest, pre-commit, `uv lock --check`, and the deterministic agent evaluation command.
 
-Infrastructure validation is separate and credential-free: OpenTofu formatting plus `init -backend=false` and `validate` for the development, bootstrap, and production roots. The production planning workflow is manual, plan-only, and designed for future GitHub OIDC federation after bootstrap. It does not run `tofu apply`.
+Infrastructure validation is separate and credential-free: OpenTofu formatting plus `init -backend=false` and `validate` for the development, bootstrap, and production roots. The production planning workflow is manual, plan-only, and uses GitHub OIDC federation through the bootstrapped Workload Identity Federation path. It does not run `tofu apply`.
 
-The Streamlit application can be built locally as a container:
+The production Streamlit application is built as an immutable Cloud Run-compatible container. Local builds use:
 
 ```shell
 docker build -t supplychain-sentinel:stage19a .
 ```
 
-The image is Cloud Run-compatible, binds Streamlit to `0.0.0.0:${PORT}`, runs as a non-root user, and contains no tracked secrets, local state, tests, docs, or Git metadata.
+The image binds Streamlit to `0.0.0.0:${PORT}`, runs as a non-root user, includes only the required PostgreSQL client runtime library for `psycopg`, and contains no tracked secrets, local state, tests, docs, or Git metadata. Production deployment uses an immutable digest rather than `latest`.
 
 ## Documentation
 

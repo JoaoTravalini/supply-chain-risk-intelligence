@@ -1,7 +1,9 @@
 # Cost and Safety Boundary
 
-Stage 19A is preparation only. It performs no cloud mutations and creates
-no billable resources.
+The project uses a separate production runtime project for approved
+Cloud Run dashboard resources while preserving the development/data
+project as billing-disabled. Production is cost-controlled rather than
+claimed to be free.
 
 ## Billable Resource Categories Modeled
 
@@ -18,8 +20,8 @@ future approved apply:
 - GCS remote-state storage;
 - future telemetry exporters or managed observability backends.
 
-Stage 19A does not quote live pricing. Cost review belongs to the human
-approval step before Stage 19B bootstrap/deployment.
+This document does not quote live pricing. Cost review belongs to human
+approval before enabling additional production resources.
 
 ## Conservative Defaults
 
@@ -47,14 +49,17 @@ the Cloud SQL Admin API. Persistent LangGraph investigation and HITL
 production capability remains deferred until agent runtime and
 PostgreSQL decisions are explicitly approved.
 
+The reviewed dashboard production deployment enables Cloud Run for the
+Streamlit service while retaining private IAM, minimum instances `0`,
+bounded maximum instances, request-based CPU allocation, and disabled
+agent runtime, Pub/Sub topology, and managed PostgreSQL.
+
 ## Billing Boundary
 
-The current development project was intentionally operated without
-billing. Stage 19A does not attach a Billing Account, enable a trial, or
-alter billing settings.
-
-Any resource requiring billing remains unapplied until an explicit later
-decision.
+The data/development project remains billing-disabled. The runtime
+project is the only production project linked to billing for approved
+runtime resources. Additional billable services remain gated until
+explicit review.
 
 ## Data and Secret Safety
 

@@ -30,7 +30,7 @@ tofu plan -out=bootstrap.tfplan
 ```
 
 The saved plan must be reviewed before any apply. Stage 19A does not run
-this apply.
+this apply; Stage 19B performed it only after explicit approval.
 
 After approved bootstrap, configure the production workflow repository
 variables:

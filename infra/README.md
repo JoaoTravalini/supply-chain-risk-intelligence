@@ -4,20 +4,20 @@ This directory contains OpenTofu roots and reusable modules for SupplyChain Sent
 
 Stage 5 defines the BigQuery analytical dataset architecture in OpenTofu and provisions the three development datasets in BigQuery Sandbox. Stage 11 defines and deploys the first RAW/CORE table and view resources. Stage 12 defines and deploys MART supplier risk current/history resources after human review of the saved Stage 12 OpenTofu plan.
 
-Stage 19A adds reviewable production preparation without changing the existing development state boundary:
+Stage 19 adds production infrastructure without changing the existing development/data state boundary:
 
 - `infra/`: existing development root for BigQuery RAW/CORE/MART resources.
 - `infra/bootstrap/`: one-time privileged production bootstrap root.
 - `infra/environments/production/`: production runtime infrastructure root.
 - `infra/modules/`: focused reusable production modules.
 
-Do not run `tofu apply` for Stage 19A. Bootstrap and production deployment are deferred to Stage 19B after explicit human approval.
+Do not run `tofu apply` without explicit human approval of the exact saved plan. Stage 19B applied the controlled bootstrap, dashboard-first foundation, and Cloud Run dashboard deployment; agent runtime, managed PostgreSQL, production Pub/Sub topology, and other gated resources remain disabled by default.
 
 ## Requirements
 
 - OpenTofu 1.12.x.
-- Access to the existing billing-free Google Cloud project when future non-local validation requires it.
-- No Cloud Billing Account linked during the billing-free development phase.
+- Access to the existing billing-disabled data/development project when non-local validation requires it.
+- Separate approved access to the production runtime project for reviewed production planning.
 
 ## Provider Strategy
 
@@ -115,7 +115,7 @@ These commands are non-mutating with respect to cloud resources. `tofu init` may
 
 Do not run `tofu apply` as a validation command. Future applies require explicit human review of the exact saved plan to be applied.
 
-Stage 19A validation for all roots:
+Static validation for all roots:
 
 ```bash
 tofu fmt -check -recursive

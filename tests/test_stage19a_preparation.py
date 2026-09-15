@@ -89,6 +89,19 @@ def test_public_cloud_run_access_is_disabled_by_default() -> None:
     assert "var.enable_cloud_run_service && var.allow_unauthenticated ? 1 : 0" in main
 
 
+def test_cloud_run_ingress_allows_authenticated_run_app_access_without_public_iam() -> None:
+    module = (ROOT / "infra" / "modules" / "cloud-run-streamlit" / "main.tf").read_text(
+        encoding="utf-8"
+    )
+    production = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert 'ingress             = "INGRESS_TRAFFIC_ALL"' in module
+    assert "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER" not in module
+    assert 'member   = "allUsers"' in production
+    assert "var.enable_cloud_run_service && var.allow_unauthenticated ? 1 : 0" in production
+    assert 'member   = "allUsers"' not in module
+
+
 def test_cloud_run_deployment_and_min_instances_are_safe_by_default() -> None:
     variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
 

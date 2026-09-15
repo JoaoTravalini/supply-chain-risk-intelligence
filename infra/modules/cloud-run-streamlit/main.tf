@@ -4,7 +4,7 @@ resource "google_cloud_run_v2_service" "streamlit" {
   name     = var.service_name
 
   deletion_protection = true
-  ingress             = "INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER"
+  ingress             = "INGRESS_TRAFFIC_ALL"
   labels              = var.labels
 
   template {

@@ -93,6 +93,10 @@ enabled. It does not receive RAW BigQuery access.
 
 Cloud Run public access remains disabled unless
 `allow_unauthenticated=true` is explicitly reviewed and approved.
+The service network ingress accepts the default `run.app` endpoint for
+authenticated developer testing through Cloud Run proxy or authenticated
+requests. IAM authentication still controls invocation; do not add
+`allUsers` unless public access is separately approved.
 
 ## Rollback
 

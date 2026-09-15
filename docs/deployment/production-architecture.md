@@ -174,6 +174,11 @@ The production container starts Streamlit headlessly, binds to
 configuration is passed as environment variables. Secrets are referenced
 from Secret Manager.
 
+Cloud Run network ingress allows the default `run.app` endpoint so an
+authenticated developer can test with Cloud Run proxy or an authenticated
+request. Invocation remains controlled by Cloud Run IAM; this does not
+grant public unauthenticated access.
+
 The current Gemini provider/key capability blocker remains external to
 the application and must be revalidated before relying on live
 investigations in production.

@@ -57,6 +57,11 @@ The default per-query budget is:
 This is exposed as `DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED` and may be
 configured with `SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED`.
 
+`SUPPLYCHAIN_GCP_PROJECT_ID` identifies the data project used in
+fully-qualified CORE/MART table references. When query jobs must run in a
+separate runtime project, set `SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID`; if
+omitted, query jobs default to `SUPPLYCHAIN_GCP_PROJECT_ID`.
+
 Every non-empty query performs a BigQuery dry run before real execution. The
 dry run disables query cache for estimation and reads `total_bytes_processed`.
 If the estimate is greater than the configured budget, the actual query is not

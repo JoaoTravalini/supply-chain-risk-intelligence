@@ -184,18 +184,87 @@ def test_config_validates_required_values(monkeypatch: pytest.MonkeyPatch) -> No
     cfg = config()
 
     assert cfg.project_id == "supplychain-local"
+    assert cfg.job_project_id is None
+    assert cfg.client_project_id == "supplychain-local"
     assert cfg.max_bytes_billed == 100
     assert cfg.default_history_limit == DEFAULT_RISK_HISTORY_LIMIT
 
     monkeypatch.setenv("SUPPLYCHAIN_GCP_PROJECT_ID", "supplychain-local")
+    monkeypatch.delenv("SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID", raising=False)
     monkeypatch.setenv("SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED", "123")
     assert agent_bigquery_config_from_env().max_bytes_billed == 123
+
+
+def test_config_preserves_data_project_and_separate_job_project() -> None:
+    cfg = config(project_id="data-project", job_project_id="job-project")
+
+    assert cfg.project_id == "data-project"
+    assert cfg.job_project_id == "job-project"
+    assert cfg.client_project_id == "job-project"
+    assert cfg.core_suppliers_table == "data-project.supplychain_core.suppliers"
+    assert cfg.core_canonical_events_view == "data-project.supplychain_core.canonical_events"
+    assert (
+        cfg.mart_supplier_risk_current_table
+        == "data-project.supplychain_mart.supplier_risk_current"
+    )
+    assert (
+        cfg.mart_supplier_risk_history_table
+        == "data-project.supplychain_mart.supplier_risk_history"
+    )
+
+
+def test_reader_uses_data_project_as_client_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    created_projects: list[str | None] = []
+
+    def fake_client(*, project: str | None = None) -> FakeBigQueryClient:
+        created_projects.append(project)
+        return FakeBigQueryClient([])
+
+    monkeypatch.setattr("supplychain.agent.data.bigquery.Client", fake_client)
+
+    reader = GuardedBigQueryReader(config(project_id="data-project"))
+    reader.close()
+
+    assert created_projects == ["data-project"]
+
+
+def test_reader_uses_job_project_for_bigquery_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    created_projects: list[str | None] = []
+
+    def fake_client(*, project: str | None = None) -> FakeBigQueryClient:
+        created_projects.append(project)
+        return FakeBigQueryClient([])
+
+    monkeypatch.setattr("supplychain.agent.data.bigquery.Client", fake_client)
+
+    reader = GuardedBigQueryReader(
+        config(project_id="data-project", job_project_id="runtime-project")
+    )
+    reader.close()
+
+    assert created_projects == ["runtime-project"]
+
+
+def test_env_loading_reads_optional_bigquery_job_project(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SUPPLYCHAIN_GCP_PROJECT_ID", "data-project")
+    monkeypatch.setenv("SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID", "runtime-project")
+    monkeypatch.setenv("SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED", "123")
+
+    cfg = agent_bigquery_config_from_env()
+
+    assert cfg.project_id == "data-project"
+    assert cfg.job_project_id == "runtime-project"
+    assert cfg.client_project_id == "runtime-project"
+    assert cfg.max_bytes_billed == 123
 
 
 @pytest.mark.parametrize(
     "kwargs",
     [
         {"project_id": ""},
+        {"project_id": "local", "job_project_id": ""},
         {"project_id": "local", "max_bytes_billed": 0},
         {"project_id": "local", "max_bytes_billed": -1},
         {"project_id": "local", "query_timeout_seconds": 0.0},

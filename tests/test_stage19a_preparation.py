@@ -215,6 +215,15 @@ def test_runtime_bigquery_iam_excludes_raw_dataset() -> None:
     assert "runtime_core_viewer" in production_text
     assert "runtime_mart_viewer" in production_text
     assert production_text.count('role       = "roles/bigquery.dataViewer"') == 2
+    assert 'role    = "roles/bigquery.dataViewer"' not in production_text
+
+
+def test_production_separates_bigquery_data_project_from_job_project() -> None:
+    main = (PRODUCTION_ROOT / "main.tf").read_text(encoding="utf-8")
+
+    assert "SUPPLYCHAIN_GCP_PROJECT_ID                  = var.data_project_id" in main
+    assert "SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID         = var.runtime_project_id" in main
+    assert "SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED = tostring(" in main
 
 
 def test_tracked_production_tfvars_contain_placeholders_not_secret_values() -> None:

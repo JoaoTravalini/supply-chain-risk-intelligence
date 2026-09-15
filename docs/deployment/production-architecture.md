@@ -112,6 +112,13 @@ Runtime access is intentionally narrow:
 The runtime service account does not receive Artifact Registry write
 permissions.
 
+The application keeps the BigQuery data-project and job-project boundary
+explicit. `SUPPLYCHAIN_GCP_PROJECT_ID` identifies the data project used
+for fully qualified CORE/MART table references, while
+`SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID` identifies the runtime project that
+owns query jobs, quota, and billing. Dashboard-first production sets
+these to the approved data and runtime projects respectively.
+
 ## Production Resource Graph
 
 The production root models:

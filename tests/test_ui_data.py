@@ -105,7 +105,11 @@ def test_portfolio_empty_state_and_presentation_rows_are_safe() -> None:
 
 def test_portfolio_data_service_uses_guarded_static_select_and_bounds_results() -> None:
     client = FakeBigQueryClient((portfolio_bigquery_row("SUP-000001"),))
-    config = AgentBigQueryConfig(project_id="supplychain-sentinel-test", max_bytes_billed=1_000)
+    config = AgentBigQueryConfig(
+        project_id="supplychain-sentinel-test",
+        job_project_id="runtime-job-project",
+        max_bytes_billed=1_000,
+    )
     service = PortfolioDataService(config, reader=GuardedBigQueryReader(config, client=client))
 
     snapshot = service.get_current_portfolio(limit=10)
@@ -120,6 +124,11 @@ def test_portfolio_data_service_uses_guarded_static_select_and_bounds_results() 
     assert client.calls[0].job_config.maximum_bytes_billed == 1_000
     assert client.calls[1].job_config.dry_run is False
     assert "supplychain_raw" not in client.calls[1].query.lower()
+    assert "supplychain-sentinel-test.supplychain_core.suppliers" in client.calls[1].query
+    assert (
+        "supplychain-sentinel-test.supplychain_mart.supplier_risk_current" in client.calls[1].query
+    )
+    assert "runtime-job-project" not in client.calls[1].query
     assert client.calls[1].query.strip().lower().startswith("select")
     assert client.calls[1].job_config.query_parameters[0].name == "limit"
 

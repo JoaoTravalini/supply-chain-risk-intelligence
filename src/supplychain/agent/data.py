@@ -34,6 +34,7 @@ from supplychain.warehouse import (
 )
 
 SUPPLYCHAIN_GCP_PROJECT_ID_ENV = "SUPPLYCHAIN_GCP_PROJECT_ID"
+SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID_ENV = "SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID"
 AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV = "SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED"
 DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED = 100 * 1024 * 1024
 DEFAULT_RISK_HISTORY_LIMIT = 20
@@ -126,6 +127,7 @@ class AgentBigQueryConfig:
     """Configuration for guarded agent BigQuery reads."""
 
     project_id: str
+    job_project_id: str | None = None
     max_bytes_billed: int = DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED
     query_timeout_seconds: float = DEFAULT_BIGQUERY_JOB_TIMEOUT_SECONDS
     default_history_limit: int = DEFAULT_RISK_HISTORY_LIMIT
@@ -140,6 +142,8 @@ class AgentBigQueryConfig:
 
     def __post_init__(self) -> None:
         _validate_identifier("project_id", self.project_id)
+        if self.job_project_id is not None:
+            _validate_identifier("job_project_id", self.job_project_id)
         _validate_positive_int("max_bytes_billed", self.max_bytes_billed)
         _validate_positive_finite("query_timeout_seconds", self.query_timeout_seconds)
         _validate_limit("default_history_limit", self.default_history_limit, self.max_history_limit)
@@ -154,6 +158,12 @@ class AgentBigQueryConfig:
             "mart_supplier_risk_history_table_id",
         ):
             _validate_identifier(name, str(getattr(self, name)))
+
+    @property
+    def client_project_id(self) -> str:
+        """Return the project that owns BigQuery query jobs."""
+
+        return self.job_project_id or self.project_id
 
     @property
     def core_suppliers_table(self) -> str:
@@ -214,7 +224,7 @@ class GuardedBigQueryReader:
     ) -> None:
         self._config = config
         self._client = (
-            cast(BigQueryReadClient, bigquery.Client(project=config.project_id))
+            cast(BigQueryReadClient, bigquery.Client(project=config.client_project_id))
             if client is None
             else client
         )
@@ -416,13 +426,21 @@ def agent_bigquery_config_from_env() -> AgentBigQueryConfig:
     project_id = os.environ.get(SUPPLYCHAIN_GCP_PROJECT_ID_ENV)
     if project_id is None or not project_id.strip():
         raise AgentDataConfigurationError(f"{SUPPLYCHAIN_GCP_PROJECT_ID_ENV} must be set")
+    job_project_id = os.environ.get(SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID_ENV)
+    normalized_job_project_id = (
+        None if job_project_id is None or not job_project_id.strip() else job_project_id
+    )
     max_bytes_value = os.environ.get(AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV)
     max_bytes = (
         DEFAULT_AGENT_BIGQUERY_MAX_BYTES_BILLED
         if max_bytes_value is None or not max_bytes_value.strip()
         else _parse_positive_int(AGENT_BIGQUERY_MAX_BYTES_BILLED_ENV, max_bytes_value)
     )
-    return AgentBigQueryConfig(project_id=project_id, max_bytes_billed=max_bytes)
+    return AgentBigQueryConfig(
+        project_id=project_id,
+        job_project_id=normalized_job_project_id,
+        max_bytes_billed=max_bytes,
+    )
 
 
 def approved_agent_data_tools(service: AgentDataService) -> Mapping[str, object]:

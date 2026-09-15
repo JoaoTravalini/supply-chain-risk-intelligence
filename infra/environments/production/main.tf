@@ -32,6 +32,7 @@ locals {
 
   non_secret_environment = {
     SUPPLYCHAIN_GCP_PROJECT_ID                  = var.data_project_id
+    SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID         = var.runtime_project_id
     SUPPLYCHAIN_ENVIRONMENT                     = var.environment
     SUPPLYCHAIN_SERVICE_NAME                    = var.service_name
     SUPPLYCHAIN_AGENT_BIGQUERY_MAX_BYTES_BILLED = tostring(var.agent_bigquery_max_bytes_billed)

@@ -12,7 +12,8 @@ future approved apply:
 - Cloud Run request/runtime usage;
 - Artifact Registry image storage and network transfer;
 - Pub/Sub message delivery and retention;
-- BigQuery query processing in the data project;
+- BigQuery query processing in the runtime/job project while reading
+  approved CORE/MART datasets in the data project;
 - Secret Manager secret storage and access;
 - GCS remote-state storage;
 - future telemetry exporters or managed observability backends.

@@ -60,6 +60,11 @@ Supplier Explorer over guarded CORE/MART BigQuery reads. Keep
 `enable_pubsub_topology=false`, `enable_agent_runtime=false`, and
 `enable_managed_postgres=false` until event processing, AI
 investigation/HITL, and managed PostgreSQL are separately reviewed.
+For this dashboard-first path, pass the data project through
+`SUPPLYCHAIN_GCP_PROJECT_ID` and the runtime/job project through
+`SUPPLYCHAIN_BIGQUERY_JOB_PROJECT_ID`; query jobs run in the runtime
+project while fully qualified CORE/MART references remain in the data
+project.
 
 ## Phase 3: Secret Seeding
 

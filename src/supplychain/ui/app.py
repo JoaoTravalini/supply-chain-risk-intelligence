@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Protocol, cast
 
 import streamlit as st
+from google.auth.exceptions import GoogleAuthError
 from pydantic import ValidationError
 
 from supplychain.agent.data import AgentDataError, RiskEvidenceInput, RiskHistoryInput
@@ -529,7 +530,7 @@ def _session_portfolio_service() -> PortfolioDataServiceLike | None:
 def _safe_portfolio_service() -> PortfolioDataServiceLike | None:
     try:
         return portfolio_service_resource()
-    except (AgentConfigurationError, AgentPersistenceError, AgentDataError):
+    except (GoogleAuthError, AgentConfigurationError, AgentPersistenceError, AgentDataError):
         return None
 
 
@@ -555,7 +556,7 @@ def _agent_data_service(service: AgentDataServiceLike | None) -> AgentDataServic
         return cast(AgentDataServiceLike, injected)
     try:
         return agent_data_service_resource()
-    except (AgentConfigurationError, AgentDataError):
+    except (GoogleAuthError, AgentConfigurationError, AgentDataError):
         return None
 
 
@@ -569,7 +570,13 @@ def _investigation_service(
         return cast(InvestigationServiceLike, injected)
     try:
         return investigation_service_resource()
-    except (AgentConfigurationError, AgentPersistenceError, AgentDataError, AgentError):
+    except (
+        GoogleAuthError,
+        AgentConfigurationError,
+        AgentPersistenceError,
+        AgentDataError,
+        AgentError,
+    ):
         return None
 
 

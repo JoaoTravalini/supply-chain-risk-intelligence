@@ -261,6 +261,20 @@ def test_dockerignore_excludes_credentials_state_and_non_runtime_content() -> No
         assert pattern in dockerignore
 
 
+def test_dockerfile_installs_only_required_postgres_runtime_client_library() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    runtime_stage = dockerfile.split("FROM python:3.13-slim AS runtime", maxsplit=1)[1]
+
+    assert "apt-get update" in runtime_stage
+    assert "apt-get install --no-install-recommends -y libpq5" in runtime_stage
+    assert "rm -rf /var/lib/apt/lists/*" in runtime_stage
+    assert "postgresql-server" not in runtime_stage
+    assert re.search(r"\bpostgresql\b", runtime_stage) is None
+    assert "build-essential" not in runtime_stage
+    assert re.search(r"\bgcc\b", runtime_stage) is None
+    assert "libpq-dev" not in runtime_stage
+
+
 def _local_list(text: str, name: str) -> list[str]:
     match = re.search(
         rf"{name}\s+=\s+(?:toset\()?(?:var\.[^\n]+\?\s+)?\[(.*?)\]",

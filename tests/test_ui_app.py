@@ -4,9 +4,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
+import pytest
+from google.auth.exceptions import DefaultCredentialsError
 from streamlit.testing.v1 import AppTest
 
 from supplychain.agent.data import RiskEvidenceInput, RiskHistoryInput
+from supplychain.agent.errors import AgentConfigurationError
 from supplychain.agent.models import (
     HumanReviewDecision,
     HumanReviewRecord,
@@ -22,6 +25,7 @@ from supplychain.contracts import CanonicalEvent
 from supplychain.domain import Criticality, SupplierCategory
 from supplychain.risk import RiskFactorFamily, RiskLevel
 from supplychain.risk.models import StructuralRiskBreakdown, SupplierRiskAssessment
+from supplychain.ui import app as ui_app
 from supplychain.ui.app import (
     ACTIVE_INVESTIGATION_STATE_KEY,
 )
@@ -86,6 +90,52 @@ def test_streamlit_application_starts_with_safe_unavailable_state() -> None:
 
     assert not app.exception
     assert any("SupplyChain Sentinel" in item.value for item in app.title)
+
+
+def test_portfolio_auth_failure_renders_safe_unavailable_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail() -> object:
+        raise default_credentials_error("ADC_SENTINEL credential detail")
+
+    monkeypatch.setattr(ui_app, "portfolio_service_resource", fail)
+
+    app = AppTest.from_function(risk_portfolio_without_injected_service_script).run()
+
+    assert not app.exception
+    assert any("Portfolio data is unavailable" in item.value for item in app.warning)
+    assert not _rendered_text_contains(app, "DefaultCredentialsError")
+    assert not _rendered_text_contains(app, "ADC_SENTINEL")
+
+
+def test_safe_resource_boundaries_handle_google_auth_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail() -> object:
+        raise default_credentials_error("ADC_SENTINEL credential detail")
+
+    monkeypatch.setattr(ui_app, "portfolio_service_resource", fail)
+    monkeypatch.setattr(ui_app, "agent_data_service_resource", fail)
+    monkeypatch.setattr(ui_app, "investigation_service_resource", fail)
+
+    assert ui_app._safe_portfolio_service() is None
+    assert ui_app._agent_data_service(None) is None
+    assert ui_app._investigation_service(None) is None
+
+
+def test_existing_non_auth_resource_errors_still_degrade_safely(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail() -> object:
+        raise AgentConfigurationError("configuration sentinel")
+
+    monkeypatch.setattr(ui_app, "portfolio_service_resource", fail)
+    monkeypatch.setattr(ui_app, "agent_data_service_resource", fail)
+    monkeypatch.setattr(ui_app, "investigation_service_resource", fail)
+
+    assert ui_app._safe_portfolio_service() is None
+    assert ui_app._agent_data_service(None) is None
+    assert ui_app._investigation_service(None) is None
 
 
 def test_risk_portfolio_page_renders_kpis_and_table_with_fake_service() -> None:
@@ -188,6 +238,12 @@ def test_pending_review_reject_requires_reason_then_submits() -> None:
 def portfolio_snapshot() -> PortfolioSnapshot:
     rows = (portfolio_row(supplier_id="SUP-000001", risk_score=41.83, risk_level=RiskLevel.MEDIUM),)
     return PortfolioSnapshot(rows=rows, summary=portfolio_summary(rows), executions=())
+
+
+def risk_portfolio_without_injected_service_script() -> None:
+    from supplychain.ui.app import render_risk_portfolio_page
+
+    render_risk_portfolio_page()
 
 
 def risk_portfolio_script(service: object) -> None:
@@ -354,3 +410,19 @@ def failed_snapshot() -> InvestigationSnapshot:
         error_message="Investigation analysis failed",
         provider_status_code="404",
     )
+
+
+def _rendered_text_contains(app: AppTest, token: str) -> bool:
+    containers = (
+        app.error,
+        app.warning,
+        app.info,
+        app.markdown,
+        app.text,
+        app.caption,
+    )
+    return any(token in str(item.value) for container in containers for item in container)
+
+
+def default_credentials_error(message: str) -> DefaultCredentialsError:
+    return DefaultCredentialsError(message)  # type: ignore[no-untyped-call]

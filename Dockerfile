@@ -21,6 +21,10 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 
 WORKDIR /app
 
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system supplychain \
     && useradd --system --gid supplychain --home-dir /app --shell /usr/sbin/nologin supplychain
 

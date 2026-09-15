@@ -28,6 +28,8 @@ The production root uses safety-first defaults:
 - Cloud Run application deployment disabled;
 - public access disabled;
 - Cloud Run minimum instances set to zero;
+- Cloud Run request-based billing with CPU idle enabled for the
+  dashboard-first service;
 - finite maximum instances;
 - production Pub/Sub topology disabled;
 - production agent/HITL runtime infrastructure disabled;

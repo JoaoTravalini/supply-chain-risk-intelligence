@@ -104,6 +104,9 @@ def test_cloud_run_ingress_allows_authenticated_run_app_access_without_public_ia
 
 def test_cloud_run_deployment_and_min_instances_are_safe_by_default() -> None:
     variables = (PRODUCTION_ROOT / "variables.tf").read_text(encoding="utf-8")
+    module = (ROOT / "infra" / "modules" / "cloud-run-streamlit" / "main.tf").read_text(
+        encoding="utf-8"
+    )
 
     assert re.search(
         r'variable\s+"enable_cloud_run_service"\s+\{[\s\S]*?default\s+=\s+false',
@@ -113,6 +116,14 @@ def test_cloud_run_deployment_and_min_instances_are_safe_by_default() -> None:
         r'variable\s+"cloud_run_min_instances"\s+\{[\s\S]*?default\s+=\s+0',
         variables,
     )
+    assert re.search(r'variable\s+"cloud_run_cpu"\s+\{[\s\S]*?default\s+=\s+"1"', variables)
+    assert re.search(
+        r'variable\s+"cloud_run_memory"\s+\{[\s\S]*?default\s+=\s+"1Gi"',
+        variables,
+    )
+    assert "cpu_idle = true" in module
+    assert "cpu    = var.cpu" in module
+    assert "memory = var.memory" in module
 
 
 def test_bootstrap_and_production_api_ownership_sets_are_disjoint() -> None:

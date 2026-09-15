@@ -110,6 +110,7 @@ def test_bootstrap_and_production_api_ownership_sets_are_disjoint() -> None:
     production_services = set(_local_list(production, "base_production_services"))
 
     assert bootstrap_services == {
+        "cloudresourcemanager.googleapis.com",
         "iam.googleapis.com",
         "iamcredentials.googleapis.com",
         "serviceusage.googleapis.com",
@@ -133,6 +134,7 @@ def test_production_does_not_own_bootstrap_platform_apis() -> None:
     assert "serviceusage.googleapis.com" not in production_services
     assert "storage.googleapis.com" not in production_services
     assert "sts.googleapis.com" not in production_services
+    assert "cloudresourcemanager.googleapis.com" not in production_services
 
 
 def test_pubsub_topology_is_disabled_by_default_and_gates_api_and_resources() -> None:

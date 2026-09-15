@@ -20,6 +20,8 @@ bucket and GitHub Workload Identity Federation.
 It is also the single OpenTofu owner for platform API enablements needed
 by state, IAM, and Workload Identity Federation. Do not duplicate those
 API resources in the production root.
+Cloud Resource Manager is part of this bootstrap-owned platform API set
+because project IAM and project-resource operations depend on it.
 
 ```shell
 cd infra/bootstrap
@@ -48,6 +50,10 @@ immutable image reference. It runs `tofu plan`; it does not run
 `tofu apply`.
 Production state owns application-specific service enablements only; APIs
 already managed by bootstrap remain bootstrap-owned and enabled.
+
+If a production apply partially succeeds, recover from the existing
+remote state. Do not destroy successfully-created resources simply to
+recreate the original all-at-once plan.
 
 The first production foundation is dashboard-first: Risk Portfolio and
 Supplier Explorer over guarded CORE/MART BigQuery reads. Keep

@@ -58,6 +58,10 @@ Bootstrap is the single OpenTofu owner for platform API enablements that
 support state, IAM, and Workload Identity Federation. Production state
 owns only application-specific service enablements. The same Google API
 enablement must not be independently managed by both states.
+Bootstrap-owned platform APIs include Cloud Resource Manager, IAM, IAM
+Credentials, Service Usage, Storage, and Security Token Service. The
+production root relies on those platform prerequisites but must not
+independently manage them.
 
 ## Workload Identity Federation
 
